@@ -45,6 +45,17 @@ async fn create_talent(
         gitlab_url: None,
         collection_id: None,
         resume_document_id: None,
+        // Social media research report document IDs
+        github_report_id: None,
+        linkedin_report_id: None,
+        twitter_report_id: None,
+        stackoverflow_report_id: None,
+        social_research_status: None,
+        // TLDR summaries for each platform
+        github_tldr: None,
+        linkedin_tldr: None,
+        twitter_tldr: None,
+        stackoverflow_tldr: None,
     };
     let inserted = crate::database::create_talent(&pool, &new_talent).await
         .map_err(actix_web::error::ErrorInternalServerError)?;

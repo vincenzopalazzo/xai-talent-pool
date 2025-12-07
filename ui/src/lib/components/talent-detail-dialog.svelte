@@ -17,7 +17,10 @@
 		Building2,
 		Github,
 		Linkedin,
-		Twitter
+		Twitter,
+		AlertCircle,
+		Sparkles,
+		RefreshCw
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Talent, Application, Job, ExperienceSummary } from '$lib/types';
@@ -109,6 +112,66 @@
 		return talent.linkedin_url || talent.x_url || talent.github_url || talent.gitlab_url;
 	});
 
+	// Check if there are any social research reports
+	const hasSocialResearch = $derived(() => {
+		return talent.github_report_id || talent.linkedin_report_id || talent.twitter_report_id || talent.stackoverflow_report_id;
+	});
+
+	// Check if social research is in progress
+	const isResearchInProgress = $derived(() => talent.social_research_status === 'in_progress');
+	const isResearchPending = $derived(() => talent.social_research_status === 'pending');
+	const isResearchCompleted = $derived(() => talent.social_research_status === 'completed');
+	const isResearchFailed = $derived(() => talent.social_research_status === 'failed');
+
+	// Polling state
+	let pollingInterval = $state<ReturnType<typeof setInterval> | null>(null);
+	let isRefreshing = $state(false);
+
+	// Start polling when dialog opens and research is in progress or pending
+	$effect(() => {
+		if (open && (isResearchInProgress() || isResearchPending())) {
+			startPolling();
+		} else {
+			stopPolling();
+		}
+		return () => stopPolling();
+	});
+
+	function startPolling() {
+		if (pollingInterval) return;
+		pollingInterval = setInterval(async () => {
+			await refreshTalentData();
+		}, 5000); // Poll every 5 seconds
+	}
+
+	function stopPolling() {
+		if (pollingInterval) {
+			clearInterval(pollingInterval);
+			pollingInterval = null;
+		}
+	}
+
+	async function refreshTalentData() {
+		isRefreshing = true;
+		try {
+			const response = await fetch(`http://localhost:8080/api/v1/talents/${talent.id}`);
+			if (response.ok) {
+				const updatedTalent = await response.json();
+				// Update talent properties
+				Object.assign(talent, updatedTalent);
+				// Stop polling if research is no longer in progress or pending
+				const status = updatedTalent.social_research_status;
+				if (status !== 'in_progress' && status !== 'pending') {
+					stopPolling();
+				}
+			}
+		} catch {
+			// Failed to refresh
+		} finally {
+			isRefreshing = false;
+		}
+	}
+
 	// Format date
 	const formatDate = (dateStr: string | undefined) => {
 		if (!dateStr) return null;
@@ -135,7 +198,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
+	<Dialog.Content class="max-h-[90vh]! max-w-4xl! w-[90vw]! overflow-y-auto">
 		<Dialog.Header>
 			<div class="flex items-start gap-4">
 				<Avatar.Root class="h-20 w-20">
@@ -242,6 +305,143 @@
 							</Button>
 						{/if}
 					</div>
+				</div>
+			{/if}
+
+			<!-- AI Research Insights -->
+			{#if talent.social_research_status || hasSocialResearch()}
+				<Separator />
+				<div class="space-y-3">
+					<div class="flex items-center justify-between">
+						<div class="flex items-center gap-2">
+							<Sparkles class="h-4 w-4 text-primary" />
+							<h3 class="text-sm font-semibold">AI Research Insights</h3>
+						</div>
+						<!-- Status indicator -->
+						{#if isResearchInProgress()}
+							<Badge variant="secondary" class="gap-1">
+								<Loader2 class="h-3 w-3 animate-spin" />
+								Analyzing...
+							</Badge>
+						{:else if isResearchPending()}
+							<Badge variant="secondary" class="gap-1 bg-amber-500">
+								<Loader2 class="h-3 w-3 animate-spin" />
+								Updating...
+							</Badge>
+						{:else if isResearchCompleted()}
+							<Badge variant="default" class="gap-1 bg-green-600">
+								<CheckCircle2 class="h-3 w-3" />
+								Complete
+							</Badge>
+						{:else if isResearchFailed()}
+							<Badge variant="destructive" class="gap-1">
+								<AlertCircle class="h-3 w-3" />
+								Failed
+							</Badge>
+						{/if}
+					</div>
+
+					{#if isResearchInProgress() && !hasSocialResearch()}
+						<div class="rounded-lg border border-dashed p-4">
+							<div class="flex items-center gap-3">
+								<div class="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
+									<Loader2 class="h-5 w-5 animate-spin text-primary" />
+								</div>
+								<div>
+									<p class="text-sm font-medium">Researching social profiles...</p>
+									<p class="text-xs text-muted-foreground">
+										Analyzing GitHub, LinkedIn, and X profiles using Grok AI
+									</p>
+								</div>
+							</div>
+						</div>
+					{:else if isResearchFailed()}
+						<div class="rounded-lg border border-destructive/50 bg-destructive/5 p-4">
+							<div class="flex items-center gap-3">
+								<div class="flex h-10 w-10 items-center justify-center rounded-full bg-destructive/10">
+									<AlertCircle class="h-5 w-5 text-destructive" />
+								</div>
+								<div class="flex-1">
+									<p class="text-sm font-medium">Research failed</p>
+									<p class="text-xs text-muted-foreground">
+										Unable to analyze social profiles. This may be due to limited public information.
+									</p>
+								</div>
+								<Button variant="outline" size="sm" onclick={refreshTalentData} disabled={isRefreshing}>
+									{#if isRefreshing}
+										<Loader2 class="mr-1 h-3 w-3 animate-spin" />
+									{:else}
+										<RefreshCw class="mr-1 h-3 w-3" />
+									{/if}
+									Retry
+								</Button>
+							</div>
+						</div>
+					{:else if hasSocialResearch()}
+						<div class="grid gap-2">
+							{#if talent.github_report_id}
+								<div class="rounded-lg border p-3">
+									<div class="flex items-center gap-2">
+										<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gray-900">
+											<Github class="h-4 w-4 text-white" />
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium">GitHub Analysis</p>
+										</div>
+										<Badge variant="outline" class="shrink-0 text-xs">Available</Badge>
+									</div>
+									{#if talent.github_tldr}
+										<p class="mt-2 text-sm text-muted-foreground">{talent.github_tldr}</p>
+									{:else}
+										<p class="mt-2 text-xs text-muted-foreground">Code contributions & projects reviewed</p>
+									{/if}
+								</div>
+							{/if}
+							{#if talent.linkedin_report_id}
+								<div class="rounded-lg border p-3">
+									<div class="flex items-center gap-2">
+										<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-600">
+											<Linkedin class="h-4 w-4 text-white" />
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium">LinkedIn Analysis</p>
+										</div>
+										<Badge variant="outline" class="shrink-0 text-xs">Available</Badge>
+									</div>
+									{#if talent.linkedin_tldr}
+										<p class="mt-2 text-sm text-muted-foreground">{talent.linkedin_tldr}</p>
+									{:else}
+										<p class="mt-2 text-xs text-muted-foreground">Professional experience reviewed</p>
+									{/if}
+								</div>
+							{/if}
+							{#if talent.twitter_report_id}
+								<div class="rounded-lg border p-3">
+									<div class="flex items-center gap-2">
+										<div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black">
+											<Twitter class="h-4 w-4 text-white" />
+										</div>
+										<div class="flex-1 min-w-0">
+											<p class="text-sm font-medium">X/Twitter Analysis</p>
+										</div>
+										<Badge variant="outline" class="shrink-0 text-xs">Available</Badge>
+									</div>
+									{#if talent.twitter_tldr}
+										<p class="mt-2 text-sm text-muted-foreground">{talent.twitter_tldr}</p>
+									{:else}
+										<p class="mt-2 text-xs text-muted-foreground">Industry engagement reviewed</p>
+									{/if}
+								</div>
+							{/if}
+						</div>
+						<p class="text-xs text-muted-foreground">
+							AI-generated insights are stored in the candidate's collection for review.
+						</p>
+					{:else}
+						<p class="text-sm text-muted-foreground">
+							No AI research insights available yet. Submit a resume to trigger analysis.
+						</p>
+					{/if}
 				</div>
 			{/if}
 

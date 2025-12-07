@@ -89,6 +89,35 @@ pub struct DocumentResponse {
     pub error: Option<String>,
 }
 
+/// Request for platform research
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchRequest {
+    pub name: String,
+    pub email: Option<String>,
+    pub profile_url: Option<String>,
+    pub collection_id: Option<String>,
+    pub old_document_id: Option<String>,
+}
+
+/// Platform research report (simplified)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformReport {
+    pub platform: String,
+    pub person_name: String,
+    pub created_at: Option<String>,
+    pub tldr: Option<String>,
+    pub raw_content: String,
+}
+
+/// Response from platform research endpoint
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResearchResponse {
+    pub success: bool,
+    pub report: Option<PlatformReport>,
+    pub document_id: Option<String>,
+    pub error: Option<String>,
+}
+
 /// Grok service client
 pub struct GrokClient {
     base_url: String,
@@ -301,6 +330,74 @@ impl GrokClient {
         info!("[GrokClient] Document upload - success: {}", parsed.success);
         if let Some(ref doc) = parsed.document {
             info!("[GrokClient] New document ID: {}", doc.document_id);
+        }
+
+        Ok(parsed)
+    }
+
+    /// Research a candidate on a specific platform
+    pub async fn research_platform(
+        &self,
+        platform: &str,
+        name: &str,
+        email: Option<&str>,
+        profile_url: Option<&str>,
+        collection_id: Option<&str>,
+        old_document_id: Option<&str>,
+    ) -> Result<ResearchResponse, String> {
+        info!("[GrokClient] Researching {} on {}", name, platform);
+        if let Some(url) = profile_url {
+            info!("[GrokClient] Using profile URL: {}", url);
+        }
+
+        let request = ResearchRequest {
+            name: name.to_string(),
+            email: email.map(|s| s.to_string()),
+            profile_url: profile_url.map(|s| s.to_string()),
+            collection_id: collection_id.map(|s| s.to_string()),
+            old_document_id: old_document_id.map(|s| s.to_string()),
+        };
+
+        let url = format!("{}/api/v1/candidate-research/{}", self.base_url, platform);
+        info!("[GrokClient] Sending POST to: {}", url);
+
+        let response = self
+            .client
+            .post(&url)
+            .json(&request)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[GrokClient] Research request failed: {}", e);
+                format!("Failed to send research request to Grok service: {}", e)
+            })?;
+
+        let status = response.status();
+        info!("[GrokClient] Research response status: {}", status);
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            error!("[GrokClient] Research error response: {}", body);
+            return Err(format!(
+                "Grok service returned error {}: {}",
+                status, body
+            ));
+        }
+
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to read research response: {}", e))?;
+
+        debug!("[GrokClient] Research response: {}", response_text);
+
+        let parsed: ResearchResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                error!("[GrokClient] Research JSON parse error: {}", e);
+                format!("Failed to parse research response: {}", e)
+            })?;
+
+        info!("[GrokClient] Research completed - success: {}", parsed.success);
+        if let Some(ref doc_id) = parsed.document_id {
+            info!("[GrokClient] Document ID: {}", doc_id);
         }
 
         Ok(parsed)

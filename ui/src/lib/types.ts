@@ -28,6 +28,17 @@ export interface Talent {
 	// xAI Collections integration
 	collection_id?: string;
 	resume_document_id?: string;
+	// Social media research
+	github_report_id?: string;
+	linkedin_report_id?: string;
+	twitter_report_id?: string;
+	stackoverflow_report_id?: string;
+	social_research_status?: 'pending' | 'in_progress' | 'completed' | 'failed' | null;
+	// TLDR summaries for each platform
+	github_tldr?: string;
+	linkedin_tldr?: string;
+	twitter_tldr?: string;
+	stackoverflow_tldr?: string;
 }
 
 export interface Job {

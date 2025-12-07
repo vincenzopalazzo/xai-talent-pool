@@ -25,6 +25,18 @@ pub struct Talent {
     // xAI Collections integration
     pub collection_id: Option<String>,
     pub resume_document_id: Option<String>,
+    // Social media research report document IDs
+    pub github_report_id: Option<String>,
+    pub linkedin_report_id: Option<String>,
+    pub twitter_report_id: Option<String>,
+    pub stackoverflow_report_id: Option<String>,
+    // Social research status: pending, in_progress, completed, failed
+    pub social_research_status: Option<String>,
+    // TLDR summaries for each platform
+    pub github_tldr: Option<String>,
+    pub linkedin_tldr: Option<String>,
+    pub twitter_tldr: Option<String>,
+    pub stackoverflow_tldr: Option<String>,
 }
 
 

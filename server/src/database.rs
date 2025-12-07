@@ -39,6 +39,24 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
         let _ = sqlx::query(statement).execute(&pool).await;
     }
 
+    // Add social report document IDs (ignore error if columns already exist)
+    let social_reports_schema = include_str!("../migrations/007_add_social_report_ids.sql");
+    for statement in social_reports_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
+    // Add social research status field (ignore error if column already exists)
+    let status_schema = include_str!("../migrations/008_add_social_research_status.sql");
+    for statement in status_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
+    // Add TLDR fields for social research (ignore error if columns already exist)
+    let tldr_schema = include_str!("../migrations/009_add_tldr_fields.sql");
+    for statement in tldr_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
     Ok(pool)
 }
 
@@ -278,6 +296,85 @@ pub async fn update_talent_resume_fields(
         .bind(&x_url)
         .bind(&github_url)
         .bind(&gitlab_url)
+        .bind(&talent_id)
+        .fetch_optional(pool)
+        .await
+}
+
+/// Update talent's social media research report IDs
+pub async fn update_talent_social_report_ids(
+    pool: &Pool,
+    talent_id: String,
+    github_report_id: Option<String>,
+    linkedin_report_id: Option<String>,
+    twitter_report_id: Option<String>,
+    stackoverflow_report_id: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        r#"UPDATE talents SET
+            github_report_id = ?,
+            linkedin_report_id = ?,
+            twitter_report_id = ?,
+            stackoverflow_report_id = ?
+        WHERE id = ? RETURNING *"#
+    )
+        .bind(&github_report_id)
+        .bind(&linkedin_report_id)
+        .bind(&twitter_report_id)
+        .bind(&stackoverflow_report_id)
+        .bind(&talent_id)
+        .fetch_optional(pool)
+        .await
+}
+
+/// Update talent's social research status
+/// Valid statuses: "pending", "in_progress", "completed", "failed"
+pub async fn update_talent_social_research_status(
+    pool: &Pool,
+    talent_id: String,
+    status: &str,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        "UPDATE talents SET social_research_status = ? WHERE id = ? RETURNING *"
+    )
+        .bind(status)
+        .bind(&talent_id)
+        .fetch_optional(pool)
+        .await
+}
+
+/// Update talent's platform research report ID and TLDR
+pub async fn update_talent_platform_research(
+    pool: &Pool,
+    talent_id: String,
+    platform: &str,
+    document_id: Option<String>,
+    tldr: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    // Build query dynamically based on platform
+    let query = match platform {
+        "github" => {
+            "UPDATE talents SET github_report_id = ?, github_tldr = ? \
+             WHERE id = ? RETURNING *"
+        }
+        "linkedin" => {
+            "UPDATE talents SET linkedin_report_id = ?, linkedin_tldr = ? \
+             WHERE id = ? RETURNING *"
+        }
+        "twitter" => {
+            "UPDATE talents SET twitter_report_id = ?, twitter_tldr = ? \
+             WHERE id = ? RETURNING *"
+        }
+        "stackoverflow" => {
+            "UPDATE talents SET stackoverflow_report_id = ?, stackoverflow_tldr = ? \
+             WHERE id = ? RETURNING *"
+        }
+        _ => return Ok(None),
+    };
+
+    sqlx::query_as::<_, Talent>(query)
+        .bind(&document_id)
+        .bind(&tldr)
         .bind(&talent_id)
         .fetch_optional(pool)
         .await
