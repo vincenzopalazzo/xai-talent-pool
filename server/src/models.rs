@@ -16,6 +16,12 @@ pub struct Talent {
     pub bio: Option<String>,
     pub verified: i32,
     pub created_at: String,
+    // Resume-extracted fields
+    pub resume_experiences: Option<String>,  // JSON array of experiences
+    pub linkedin_url: Option<String>,
+    pub x_url: Option<String>,
+    pub github_url: Option<String>,
+    pub gitlab_url: Option<String>,
 }
 
 

@@ -21,6 +21,12 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
         sqlx::query(statement).execute(&pool).await?;
     }
 
+    // Add resume fields to talents (ignore error if columns already exist)
+    let resume_fields_schema = include_str!("../migrations/004_add_talent_resume_fields.sql");
+    for statement in resume_fields_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
     Ok(pool)
 }
 
@@ -211,5 +217,26 @@ pub async fn get_applications_by_job(pool: &Pool, job_id: String) -> Result<Vec<
     sqlx::query_as::<_, Application>(include_str!("queries/get_applications_by_job.sql"))
         .bind(&job_id)
         .fetch_all(pool)
+        .await
+}
+
+/// Update talent's resume-extracted fields
+pub async fn update_talent_resume_fields(
+    pool: &Pool,
+    talent_id: String,
+    resume_experiences: Option<String>,
+    linkedin_url: Option<String>,
+    x_url: Option<String>,
+    github_url: Option<String>,
+    gitlab_url: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(include_str!("queries/update_talent_resume_fields.sql"))
+        .bind(&resume_experiences)
+        .bind(&linkedin_url)
+        .bind(&x_url)
+        .bind(&github_url)
+        .bind(&gitlab_url)
+        .bind(&talent_id)
+        .fetch_optional(pool)
         .await
 }

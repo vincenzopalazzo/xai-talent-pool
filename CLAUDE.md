@@ -147,6 +147,24 @@ grok-service/
 - Health check at `/health`
 - Use Pydantic models for request/response schemas
 
+## Logging Standards
+
+**Never use print statements for logging. Always use the logging library of each project.**
+
+### Rust (server/)
+- Use the `log` crate with `info!`, `error!`, `debug!`, `warn!` macros
+- Logger is initialized with `env_logger` in main.rs
+- Example: `log::info!("Processing request for {}", id);`
+
+### Python (grok-service/)
+- Use the `logging` module from Python standard library
+- Get logger with: `logger = logging.getLogger(__name__)`
+- Example: `logger.info("Processing request for %s", id)`
+
+### TypeScript/Svelte (ui/)
+- Use `console.log`, `console.error`, `console.warn` for development
+- Consider structured logging for production
+
 ## File Naming Conventions
 
 - Components: `kebab-case.svelte` (e.g., `talent-card.svelte`)

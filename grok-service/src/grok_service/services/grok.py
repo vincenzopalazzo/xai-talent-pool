@@ -95,7 +95,18 @@ Resume content:
 Respond with the JSON structure only."""
 
         chat.append(user(prompt))
+
+        logger.info("=" * 70)
+        logger.info("GROK AI: Sending request to Grok...")
+        logger.info("=" * 70)
+
         response = chat.sample()
+
+        logger.info("=" * 70)
+        logger.info("GROK AI: RAW RESPONSE FROM GROK")
+        logger.info("=" * 70)
+        logger.info(response.content)
+        logger.info("=" * 70)
 
         # Parse the JSON response
         try:
@@ -109,7 +120,18 @@ Respond with the JSON structure only."""
                 content = content[:-3]
             content = content.strip()
 
+            logger.info("GROK AI: CLEANED JSON")
+            logger.info("=" * 70)
+            logger.info(content)
+            logger.info("=" * 70)
+
             data = json.loads(content)
+
+            logger.info("GROK AI: PARSED DATA")
+            logger.info("=" * 70)
+            logger.info(json.dumps(data, indent=2))
+            logger.info("=" * 70)
+
             return ResumeAnalysis(
                 experiences=[
                     ExperienceSummary(**exp) for exp in data.get("experiences", [])
@@ -117,8 +139,10 @@ Respond with the JSON structure only."""
                 urls=data.get("urls", {}),
             )
         except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Grok response as JSON: {e}")
-            logger.error(f"Raw response: {response.content}")
+            logger.error("=" * 70)
+            logger.error("GROK AI: JSON PARSE ERROR: %s", e)
+            logger.error("Raw response: %s", response.content)
+            logger.error("=" * 70)
             # Return empty result on parse failure
             return ResumeAnalysis(
                 experiences=[],

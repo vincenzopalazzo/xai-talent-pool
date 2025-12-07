@@ -14,10 +14,13 @@
 		FileText,
 		Eye,
 		Loader2,
-		Building2
+		Building2,
+		Github,
+		Linkedin,
+		Twitter
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
-	import type { Talent, Application, Job } from '$lib/types';
+	import type { Talent, Application, Job, ExperienceSummary } from '$lib/types';
 
 	let {
 		talent,
@@ -89,6 +92,21 @@
 		if (!talent.skills) return [];
 		if (Array.isArray(talent.skills)) return talent.skills;
 		return (talent.skills as unknown as string).split(',').map((s) => s.trim()).filter((s) => s);
+	});
+
+	// Parse resume experiences from JSON string
+	const resumeExperiences = $derived(() => {
+		if (!talent.resume_experiences) return [];
+		try {
+			return JSON.parse(talent.resume_experiences) as ExperienceSummary[];
+		} catch {
+			return [];
+		}
+	});
+
+	// Check if there are any social links
+	const hasSocialLinks = $derived(() => {
+		return talent.linkedin_url || talent.x_url || talent.github_url || talent.gitlab_url;
 	});
 
 	// Format date
@@ -188,6 +206,67 @@
 					<div class="flex flex-wrap gap-2">
 						{#each skills() as skill}
 							<Badge variant="outline">{skill}</Badge>
+						{/each}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Social Links (from Grok analysis) -->
+			{#if hasSocialLinks()}
+				<Separator />
+				<div class="space-y-2">
+					<h3 class="text-sm font-semibold">Social Profiles</h3>
+					<div class="flex flex-wrap gap-2">
+						{#if talent.linkedin_url}
+							<Button variant="outline" size="sm" href={talent.linkedin_url} target="_blank" rel="noopener noreferrer">
+								<Linkedin class="mr-1 h-4 w-4" />
+								LinkedIn
+							</Button>
+						{/if}
+						{#if talent.x_url}
+							<Button variant="outline" size="sm" href={talent.x_url} target="_blank" rel="noopener noreferrer">
+								<Twitter class="mr-1 h-4 w-4" />
+								X
+							</Button>
+						{/if}
+						{#if talent.github_url}
+							<Button variant="outline" size="sm" href={talent.github_url} target="_blank" rel="noopener noreferrer">
+								<Github class="mr-1 h-4 w-4" />
+								GitHub
+							</Button>
+						{/if}
+						{#if talent.gitlab_url}
+							<Button variant="outline" size="sm" href={talent.gitlab_url} target="_blank" rel="noopener noreferrer">
+								<ExternalLink class="mr-1 h-4 w-4" />
+								GitLab
+							</Button>
+						{/if}
+					</div>
+				</div>
+			{/if}
+
+			<!-- Work Experience (from Grok analysis) -->
+			{#if resumeExperiences().length > 0}
+				<Separator />
+				<div class="space-y-3">
+					<h3 class="text-sm font-semibold">Work Experience (from Resume)</h3>
+					<div class="space-y-3">
+						{#each resumeExperiences() as exp, i}
+							<div class="rounded-lg border p-3">
+								<div class="flex items-start gap-2">
+									<Building2 class="mt-0.5 h-4 w-4 text-muted-foreground" />
+									<div class="flex-1">
+										<div class="font-medium text-sm">{exp.role}</div>
+										<div class="text-sm text-muted-foreground">{exp.company}</div>
+										{#if exp.duration}
+											<div class="text-xs text-muted-foreground mt-0.5">{exp.duration}</div>
+										{/if}
+										{#if exp.summary}
+											<p class="text-sm mt-2">{exp.summary}</p>
+										{/if}
+									</div>
+								</div>
+							</div>
 						{/each}
 					</div>
 				</div>

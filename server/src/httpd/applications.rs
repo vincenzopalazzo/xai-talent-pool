@@ -2,8 +2,10 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use paperclip::actix::api_v2_operation;
 use uuid::Uuid;
 use chrono::Utc;
+use log::{info, error};
 
 use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError};
+use crate::grok_client::{GrokClient, TalentInfo};
 use super::server::AppState;
 
 #[api_v2_operation]
@@ -48,6 +50,110 @@ pub async fn create_application(
 
     let inserted = crate::database::create_application(pool, &new_application).await
         .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    // If there's a resume, analyze it with Grok service
+    if let (Some(resume_data), Some(talent)) = (&inserted.resume_data, talent) {
+        // Decode base64 resume
+        use base64::{Engine as _, engine::general_purpose::STANDARD};
+        if let Ok(pdf_bytes) = STANDARD.decode(resume_data) {
+            let talent_info = TalentInfo {
+                id: talent.id.clone(),
+                name: talent.name.clone(),
+                email: talent.email.clone(),
+                handle: talent.handle.clone(),
+                skills: talent.skills.clone(),
+                title: talent.title.clone(),
+                location: talent.location.clone(),
+                experience: talent.experience.clone(),
+                bio: talent.bio.clone(),
+            };
+
+            let filename = inserted.resume_filename
+                .clone()
+                .unwrap_or_else(|| "resume.pdf".to_string());
+
+            // Call Grok service asynchronously (don't block response)
+            let grok_url = data.grok_service_url.clone();
+            let pool_clone = pool.clone();
+            let talent_id = talent.id.clone();
+
+            tokio::spawn(async move {
+                info!("======================================================================");
+                info!("GROK ANALYSIS STARTING");
+                info!("======================================================================");
+                info!("Talent ID: {}", talent_id);
+                info!("Grok service URL: {}", grok_url);
+                info!("Resume filename: {}", filename);
+                info!("PDF size: {} bytes", pdf_bytes.len());
+
+                let client = GrokClient::new(&grok_url);
+
+                match client.analyze_resume(&talent_info, &pdf_bytes, &filename).await {
+                    Ok(response) => {
+                        info!("======================================================================");
+                        info!("GROK RESPONSE RECEIVED - Success: {}", response.success);
+                        if let Some(ref err) = response.error {
+                            error!("Grok error: {}", err);
+                        }
+
+                        if response.success {
+                            if let Some(result) = response.result {
+                                info!("======================================================================");
+                                info!("EXTRACTED INFORMATION FROM RESUME");
+                                info!("======================================================================");
+                                info!("Talent ID: {}", result.talent_id);
+                                info!("WORK EXPERIENCES ({} found):", result.experiences.len());
+                                for (i, exp) in result.experiences.iter().enumerate() {
+                                    info!("  {}. {} at {}", i + 1, exp.role, exp.company);
+                                    if let Some(ref duration) = exp.duration {
+                                        info!("     Duration: {}", duration);
+                                    }
+                                    info!("     Summary: {}", exp.summary);
+                                }
+                                info!("SOCIAL PROFILE URLS:");
+                                info!("  LinkedIn: {}", result.urls.linkedin.as_deref().unwrap_or("Not found"));
+                                info!("  X/Twitter: {}", result.urls.x.as_deref().unwrap_or("Not found"));
+                                info!("  GitHub: {}", result.urls.github.as_deref().unwrap_or("Not found"));
+                                info!("  GitLab: {}", result.urls.gitlab.as_deref().unwrap_or("Not found"));
+                                info!("======================================================================");
+
+                                // Serialize experiences to JSON
+                                let experiences_json = serde_json::to_string(&result.experiences)
+                                    .ok();
+
+                                // Update talent with extracted info
+                                match crate::database::update_talent_resume_fields(
+                                    &pool_clone,
+                                    talent_id.clone(),
+                                    experiences_json,
+                                    result.urls.linkedin,
+                                    result.urls.x,
+                                    result.urls.github,
+                                    result.urls.gitlab,
+                                ).await {
+                                    Ok(_updated) => {
+                                        info!("SUCCESS: Updated talent {} with resume data", talent_id);
+                                    },
+                                    Err(e) => {
+                                        error!("FAILED to update talent {}: {}", talent_id, e);
+                                    }
+                                }
+                            } else {
+                                info!("No result in response (result is None)");
+                            }
+                        } else {
+                            error!("Grok analysis failed: {:?}", response.error);
+                        }
+                    }
+                    Err(e) => {
+                        error!("======================================================================");
+                        error!("GROK SERVICE ERROR: {}", e);
+                        error!("======================================================================");
+                    }
+                }
+            });
+        }
+    }
 
     // Return response without the full resume data
     let response = ApplicationResponse {
