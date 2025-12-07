@@ -44,7 +44,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="h-[95vh] w-[95vw] max-w-[95vw] p-0">
+	<Dialog.Content class="!h-[95vh] !w-[95vw] !max-w-[95vw] !sm:max-w-[95vw] p-0" showCloseButton={false}>
 		<Dialog.Header class="flex flex-row items-center justify-between border-b px-4 py-3">
 			<div>
 				<Dialog.Title class="text-lg">{filename}</Dialog.Title>
