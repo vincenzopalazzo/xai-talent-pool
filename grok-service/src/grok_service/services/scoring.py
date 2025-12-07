@@ -89,7 +89,9 @@ class CandidateScoringService:
             model="grok-4-1-fast",
             tools=[
                 collections_search(
-                    collection_ids=[collection_id],  # Single collection for this candidate
+                    collection_ids=[
+                        collection_id
+                    ],  # Single collection for this candidate
                     limit=5,  # Reduced limit for faster response
                     instructions="Search this candidate's resume and profile documents.",
                     retrieval_mode="hybrid",

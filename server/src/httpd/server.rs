@@ -7,7 +7,7 @@ use super::talents::{
     get_talents, create_talent, get_talent, get_talent_by_email, update_talent, delete_talent, delete_talents_bulk, trigger_scoring,
 };
 use super::jobs::{
-    get_jobs, create_job, get_job, update_job, delete_job,
+    get_jobs, create_job, get_job, update_job, delete_job, get_job_matches, generate_job_matches,
 };
 use super::applications::{
     create_application, get_application, get_applications_by_talent, get_applications_by_job, get_application_resume, delete_application, delete_applications_bulk,
@@ -109,6 +109,8 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str, gro
             .service(get_job)
             .service(update_job)
             .service(delete_job)
+            .service(get_job_matches)
+            .service(generate_job_matches)
             // Application routes
             .service(create_application)
             .service(get_applications_by_talent)

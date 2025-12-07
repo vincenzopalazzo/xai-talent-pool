@@ -173,6 +173,60 @@ pub struct CandidateScoringResponse {
     pub error: Option<String>,
 }
 
+/// Talent info for job matching request
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TalentForMatching {
+    pub id: String,
+    pub name: String,
+    pub title: String,
+    pub skills: String,
+    pub experience: String,
+    pub collection_id: String,
+}
+
+/// Request for job matching
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobMatchingRequest {
+    pub job_id: String,
+    pub job_title: String,
+    pub job_description: String,
+    pub company_name: String,
+    pub skills_required: String,
+    pub experience_level: String,
+    pub candidates: Vec<TalentForMatching>,
+    pub top_n: i32,
+}
+
+/// A candidate match result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CandidateMatch {
+    pub talent_id: String,
+    pub talent_name: String,
+    pub talent_title: String,
+    pub score: f64,
+    pub rank: i32,
+    pub match_reasons: Vec<String>,
+    pub concerns: Vec<String>,
+    pub summary: String,
+}
+
+/// Job matching result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobMatchingResult {
+    pub job_id: String,
+    pub matches: Vec<CandidateMatch>,
+    pub total_evaluated: i32,
+    pub timestamp: String,
+}
+
+/// Response for job matching
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobMatchingResponse {
+    pub success: bool,
+    pub result: Option<JobMatchingResult>,
+    pub error: Option<String>,
+}
+
 /// Grok service client
 pub struct GrokClient {
     base_url: String,
@@ -484,6 +538,57 @@ impl GrokClient {
         info!("[GrokClient] Candidate scoring - success: {}", parsed.success);
         if let Some(ref result) = parsed.result {
             info!("[GrokClient] Score: {}, Recommendation: {}", result.overall_score, result.recommendation);
+        }
+
+        Ok(parsed)
+    }
+
+    /// Match candidates to a job using cross-collection search
+    pub async fn match_candidates_to_job(
+        &self,
+        request: &JobMatchingRequest,
+    ) -> Result<JobMatchingResponse, String> {
+        info!("[GrokClient] Matching {} candidates to job {}", request.candidates.len(), request.job_id);
+
+        let url = format!("{}/api/v1/matching/job", self.base_url);
+        info!("[GrokClient] Sending POST to: {}", url);
+
+        let response = self
+            .client
+            .post(&url)
+            .json(request)
+            .timeout(std::time::Duration::from_secs(300)) // 5 minute timeout for large candidate pools
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[GrokClient] Job matching request failed: {}", e);
+                format!("Failed to send request to Grok service: {}", e)
+            })?;
+
+        let status = response.status();
+        info!("[GrokClient] Job matching response status: {}", status);
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            error!("[GrokClient] Job matching error response: {}", body);
+            return Err(format!(
+                "Grok service returned error {}: {}",
+                status, body
+            ));
+        }
+
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        let parsed: JobMatchingResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                error!("[GrokClient] Job matching JSON parse error: {}", e);
+                format!("Failed to parse response: {}", e)
+            })?;
+
+        info!("[GrokClient] Job matching - success: {}", parsed.success);
+        if let Some(ref result) = parsed.result {
+            info!("[GrokClient] Found {} matches for job", result.matches.len());
         }
 
         Ok(parsed)
