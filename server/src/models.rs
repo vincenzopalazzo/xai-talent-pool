@@ -25,8 +25,35 @@ pub struct Talent {
     // xAI Collections integration
     pub collection_id: Option<String>,
     pub resume_document_id: Option<String>,
+    // Social Media Analysis
+    pub social_analysis: Option<String>, // JSON string of analysis
+    pub x_handle_discovered: Option<String>,
 }
 
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
+pub struct SocialMediaAnalysis {
+    pub talent_id: String,
+    pub x_handle: Option<String>,
+    pub tldr: Option<String>,
+    pub profiles: Vec<PlatformProfile>,
+    pub combined_skills: Vec<String>,
+    pub summary: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
+pub struct PlatformProfile {
+    pub platform: String,
+    pub handle: Option<String>,
+    pub url: Option<String>,
+    pub verified: bool,
+    pub bio: Option<String>,
+    pub tldr: Option<String>,
+    pub highlights: Vec<String>,
+    pub skills: Vec<String>,
+    pub experience_signals: Vec<String>,
+    pub red_flags: Vec<String>,
+    pub recruiter_notes: Vec<String>,
+}
 
 #[derive(Deserialize, Apiv2Schema)]
 pub struct CreateTalentRequest {

@@ -5,6 +5,29 @@ export interface ExperienceSummary {
 	summary: string;
 }
 
+export interface PlatformProfile {
+	platform: string;
+	handle?: string;
+	url?: string;
+	verified: boolean;
+	bio?: string;
+	tldr?: string;
+	highlights: string[];
+	skills: string[];
+	experience_signals: string[];
+	red_flags: string[];
+	recruiter_notes: string[];
+}
+
+export interface SocialMediaAnalysis {
+	talent_id: string;
+	x_handle?: string;
+	tldr?: string;
+	profiles: PlatformProfile[];
+	combined_skills: string[];
+	summary?: string;
+}
+
 export interface Talent {
 	id: string;
 	name: string;
@@ -28,6 +51,9 @@ export interface Talent {
 	// xAI Collections integration
 	collection_id?: string;
 	resume_document_id?: string;
+	// Social Media Analysis
+	social_analysis?: string; // JSON string of SocialMediaAnalysis
+	x_handle_discovered?: string;
 }
 
 export interface Job {

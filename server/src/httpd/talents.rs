@@ -45,6 +45,8 @@ async fn create_talent(
         gitlab_url: None,
         collection_id: None,
         resume_document_id: None,
+        social_analysis: None,
+        x_handle_discovered: None,
     };
     let inserted = crate::database::create_talent(&pool, &new_talent).await
         .map_err(actix_web::error::ErrorInternalServerError)?;
