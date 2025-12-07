@@ -15,11 +15,13 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import JobDetailsDialog from './job-details-dialog.svelte';
+	import ApplyJobDialog from './apply-job-dialog.svelte';
 	import type { Job } from '$lib/types';
 
 	let { job }: { job: Job } = $props();
 	let isSaved = $state<boolean | null>(null);
 	let detailsDialogOpen = $state(false);
+	let applyDialogOpen = $state(false);
 
 	$effect(() => {
 		if (isSaved === null) {
@@ -171,8 +173,9 @@
 		<Button variant="outline" class="flex-1" size="sm" onclick={() => (detailsDialogOpen = true)}>
 			Learn More
 		</Button>
-		<Button class="flex-1" size="sm">Apply Now</Button>
+		<Button class="flex-1" size="sm" onclick={() => (applyDialogOpen = true)}>Apply Now</Button>
 	</Card.Footer>
 </Card.Root>
 
 <JobDetailsDialog {job} bind:open={detailsDialogOpen} />
+<ApplyJobDialog {job} bind:open={applyDialogOpen} />
