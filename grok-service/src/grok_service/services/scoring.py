@@ -148,8 +148,8 @@ Respond with this exact JSON structure:
         chat.append(user(scoring_prompt))
 
         try:
-            # Run the agentic loop - Grok will search the collection and analyze
-            response = chat.run()
+            # Sample from the chat - Grok will search the collection and analyze
+            response = chat.sample()
 
             logger.info(
                 "SCORING: Response received (%d tokens)",
