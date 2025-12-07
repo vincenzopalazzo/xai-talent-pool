@@ -14,6 +14,7 @@
 		ExternalLink,
 		Star
 	} from 'lucide-svelte';
+	import ApplyJobDialog from './apply-job-dialog.svelte';
 	import type { Job } from '$lib/types';
 
 	let {
@@ -23,6 +24,8 @@
 		job: Job;
 		open: boolean;
 	} = $props();
+
+	let applyDialogOpen = $state(false);
 
 	// Parse skills from comma-separated string
 	const skills = $derived(
@@ -178,10 +181,12 @@
 			<Button variant="outline" class="w-full sm:w-auto" onclick={() => (open = false)}>
 				Close
 			</Button>
-			<Button class="w-full sm:flex-1">
+			<Button class="w-full sm:flex-1" onclick={() => (applyDialogOpen = true)}>
 				<ExternalLink class="mr-2 h-4 w-4" />
 				Apply Now
 			</Button>
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<ApplyJobDialog {job} bind:open={applyDialogOpen} />

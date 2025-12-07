@@ -56,6 +56,24 @@ async fn get_talent(
 }
 
 #[api_v2_operation]
+#[paperclip::actix::get("/api/v1/talents/email/{email}", summary = "Get talent by email")]
+pub async fn get_talent_by_email(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> ActixResult<HttpResponse> {
+    let email = path.into_inner();
+    let pool = &data.db_pool;
+    match crate::database::get_talent_by_email(pool, email).await {
+        Ok(Some(talent)) => Ok(HttpResponse::Ok().json(talent)),
+        Ok(None) => Ok(HttpResponse::NotFound().json(crate::models::ApiError {
+            message: "Talent not found".to_string(),
+            code: 404,
+        })),
+        Err(e) => Err(actix_web::error::ErrorInternalServerError(e)),
+    }
+}
+
+#[api_v2_operation]
 #[paperclip::actix::put("/api/v1/talents/{id}", summary = "Update a talent")]
 async fn update_talent(
     data: web::Data<AppState>,

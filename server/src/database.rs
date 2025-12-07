@@ -50,6 +50,13 @@ pub async fn get_talent_by_id(pool: &Pool, id: String) -> Result<Option<Talent>,
         .await
 }
 
+pub async fn get_talent_by_email(pool: &Pool, email: String) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(include_str!("queries/get_talent_by_email.sql"))
+        .bind(&email)
+        .fetch_optional(pool)
+        .await
+}
+
 pub async fn update_talent(pool: &Pool, id: String, updates: &UpdateTalentRequest) -> Result<Option<Talent>, sqlx::Error> {
     let query_str = include_str!("queries/update_talent.sql");
     let name = updates.name.as_ref().map(|s| s as &str).unwrap_or("");
