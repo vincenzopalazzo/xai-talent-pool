@@ -240,21 +240,22 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[90vh] max-w-2xl overflow-y-auto">
-		<Dialog.Header>
-			<div class="flex items-start gap-4">
-				<Avatar.Root class="h-20 w-20">
+	<Dialog.Content class="!max-h-[95vh] !max-w-6xl !w-[95vw] sm:!max-w-6xl overflow-hidden flex flex-col">
+		<!-- Header Section -->
+		<Dialog.Header class="flex-shrink-0 border-b pb-6">
+			<div class="flex items-start gap-6">
+				<Avatar.Root class="h-24 w-24 ring-4 ring-background shadow-lg">
 					{#if talent.avatar}
 						<Avatar.Image src={talent.avatar} alt={talent.name} />
 					{/if}
-					<Avatar.Fallback class="text-xl">{talent.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>
+					<Avatar.Fallback class="text-2xl font-semibold">{talent.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>
 				</Avatar.Root>
-				<div class="flex-1">
-					<div class="flex items-center gap-2">
-						<Dialog.Title class="text-xl">{talent.name}</Dialog.Title>
+				<div class="flex-1 space-y-2">
+					<div class="flex items-center gap-3">
+						<Dialog.Title class="text-2xl font-bold">{talent.name}</Dialog.Title>
 						{#if talent.verified}
-							<Badge variant="secondary" class="gap-1">
-								<CheckCircle2 class="h-3 w-3" />
+							<Badge variant="secondary" class="gap-1 px-2 py-1">
+								<CheckCircle2 class="h-3.5 w-3.5" />
 								Verified
 							</Badge>
 						{/if}
@@ -262,127 +263,135 @@
 					<Dialog.Description class="text-base text-muted-foreground">
 						@{talent.handle}
 					</Dialog.Description>
-					<p class="mt-1 text-sm font-medium">{talent.title}</p>
+					<p class="text-lg font-medium text-foreground">{talent.title}</p>
+
+					<!-- Quick info row -->
+					<div class="flex flex-wrap items-center gap-4 pt-2 text-sm text-muted-foreground">
+						{#if talent.email}
+							<div class="flex items-center gap-1.5">
+								<Mail class="h-4 w-4" />
+								<span>{talent.email}</span>
+							</div>
+						{/if}
+						{#if talent.location}
+							<div class="flex items-center gap-1.5">
+								<MapPin class="h-4 w-4" />
+								<span>{talent.location}</span>
+							</div>
+						{/if}
+						<div class="flex items-center gap-1.5">
+							<Briefcase class="h-4 w-4" />
+							<span>{talent.experience}</span>
+						</div>
+						{#if talent.created_at}
+							<div class="flex items-center gap-1.5">
+								<Calendar class="h-4 w-4" />
+								<span>Joined {formatDate(talent.created_at)}</span>
+							</div>
+						{/if}
+					</div>
 				</div>
 			</div>
 		</Dialog.Header>
 
-		<div class="space-y-6 py-4">
-			<!-- Key details -->
-			<div class="grid gap-3 rounded-lg bg-muted/50 p-4 sm:grid-cols-2">
-				{#if talent.email}
-					<div class="flex items-center gap-2 text-sm">
-						<Mail class="h-4 w-4 text-muted-foreground" />
-						<span>{talent.email}</span>
-					</div>
-				{/if}
-				{#if talent.location}
-					<div class="flex items-center gap-2 text-sm">
-						<MapPin class="h-4 w-4 text-muted-foreground" />
-						<span>{talent.location}</span>
-					</div>
-				{/if}
-				<div class="flex items-center gap-2 text-sm">
-					<Briefcase class="h-4 w-4 text-muted-foreground" />
-					<span>{talent.experience}</span>
+		<!-- Scrollable Content -->
+		<div class="flex-1 overflow-y-auto py-6 px-2">
+			<div class="grid gap-8 lg:grid-cols-3">
+				<!-- Left Column: About, Skills, Social -->
+				<div class="space-y-6">
+					<!-- Bio -->
+					{#if talent.bio}
+						<div class="space-y-3">
+							<h3 class="text-lg font-semibold">About</h3>
+							<p class="whitespace-pre-wrap text-base text-muted-foreground leading-relaxed">{talent.bio}</p>
+						</div>
+					{/if}
+
+					<!-- Skills -->
+					{#if skills().length > 0}
+						<div class="space-y-3">
+							<h3 class="text-lg font-semibold">Skills</h3>
+							<div class="flex flex-wrap gap-2">
+								{#each skills() as skill}
+									<Badge variant="outline" class="px-4 py-1.5 text-sm">{skill}</Badge>
+								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Social Links -->
+					{#if hasSocialLinks()}
+						<div class="space-y-3">
+							<h3 class="text-lg font-semibold">Social Profiles</h3>
+							<div class="flex flex-wrap gap-3">
+								{#if talent.linkedin_url}
+									<Button variant="outline" href={talent.linkedin_url} target="_blank" rel="noopener noreferrer">
+										<Linkedin class="mr-2 h-4 w-4" />
+										LinkedIn
+									</Button>
+								{/if}
+								{#if talent.x_url}
+									<Button variant="outline" href={talent.x_url} target="_blank" rel="noopener noreferrer">
+										<Twitter class="mr-2 h-4 w-4" />
+										X
+									</Button>
+								{/if}
+								{#if talent.github_url}
+									<Button variant="outline" href={talent.github_url} target="_blank" rel="noopener noreferrer">
+										<Github class="mr-2 h-4 w-4" />
+										GitHub
+									</Button>
+								{/if}
+								{#if talent.gitlab_url}
+									<Button variant="outline" href={talent.gitlab_url} target="_blank" rel="noopener noreferrer">
+										<ExternalLink class="mr-2 h-4 w-4" />
+										GitLab
+									</Button>
+								{/if}
+							</div>
+						</div>
+					{/if}
 				</div>
-				{#if talent.created_at}
-					<div class="flex items-center gap-2 text-sm text-muted-foreground">
-						<Calendar class="h-4 w-4" />
-						<span>Joined {formatDate(talent.created_at)}</span>
-					</div>
-				{/if}
+
+				<!-- Middle Column: Work Experience -->
+				<div class="space-y-6 lg:col-span-2">
+					<!-- Work Experience -->
+					{#if resumeExperiences().length > 0}
+						<div class="space-y-4">
+							<h3 class="text-lg font-semibold">Work Experience</h3>
+							<div class="grid gap-4 md:grid-cols-2">
+								{#each resumeExperiences() as exp}
+									<div class="rounded-lg border bg-card p-5">
+										<div class="flex items-start gap-4">
+											<div class="rounded-full bg-muted p-3">
+												<Building2 class="h-5 w-5 text-muted-foreground" />
+											</div>
+											<div class="flex-1 space-y-2">
+												<div class="text-lg font-semibold">{exp.role}</div>
+												<div class="text-base text-muted-foreground">{exp.company}</div>
+												{#if exp.duration}
+													<div class="text-sm text-muted-foreground">{exp.duration}</div>
+												{/if}
+												{#if exp.summary}
+													<p class="text-sm mt-3 leading-relaxed text-muted-foreground">{exp.summary}</p>
+												{/if}
+											</div>
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+					{/if}
+				</div>
 			</div>
 
-			<!-- Bio -->
-			{#if talent.bio}
-				<div class="space-y-2">
-					<h3 class="text-sm font-semibold">About</h3>
-					<p class="whitespace-pre-wrap text-sm text-muted-foreground">{talent.bio}</p>
-				</div>
-
-				<Separator />
-			{/if}
-
-			<!-- Skills -->
-			{#if skills().length > 0}
-				<div class="space-y-2">
-					<h3 class="text-sm font-semibold">Skills</h3>
-					<div class="flex flex-wrap gap-2">
-						{#each skills() as skill}
-							<Badge variant="outline">{skill}</Badge>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<!-- Social Links (from Grok analysis) -->
-			{#if hasSocialLinks()}
-				<Separator />
-				<div class="space-y-2">
-					<h3 class="text-sm font-semibold">Social Profiles</h3>
-					<div class="flex flex-wrap gap-2">
-						{#if talent.linkedin_url}
-							<Button variant="outline" size="sm" href={talent.linkedin_url} target="_blank" rel="noopener noreferrer">
-								<Linkedin class="mr-1 h-4 w-4" />
-								LinkedIn
-							</Button>
-						{/if}
-						{#if talent.x_url}
-							<Button variant="outline" size="sm" href={talent.x_url} target="_blank" rel="noopener noreferrer">
-								<Twitter class="mr-1 h-4 w-4" />
-								X
-							</Button>
-						{/if}
-						{#if talent.github_url}
-							<Button variant="outline" size="sm" href={talent.github_url} target="_blank" rel="noopener noreferrer">
-								<Github class="mr-1 h-4 w-4" />
-								GitHub
-							</Button>
-						{/if}
-						{#if talent.gitlab_url}
-							<Button variant="outline" size="sm" href={talent.gitlab_url} target="_blank" rel="noopener noreferrer">
-								<ExternalLink class="mr-1 h-4 w-4" />
-								GitLab
-							</Button>
-						{/if}
-					</div>
-				</div>
-			{/if}
-
-			<!-- Work Experience (from Grok analysis) -->
-			{#if resumeExperiences().length > 0}
-				<Separator />
-				<div class="space-y-3">
-					<h3 class="text-sm font-semibold">Work Experience (from Resume)</h3>
-					<div class="space-y-3">
-						{#each resumeExperiences() as exp, i}
-							<div class="rounded-lg border p-3">
-								<div class="flex items-start gap-2">
-									<Building2 class="mt-0.5 h-4 w-4 text-muted-foreground" />
-									<div class="flex-1">
-										<div class="font-medium text-sm">{exp.role}</div>
-										<div class="text-sm text-muted-foreground">{exp.company}</div>
-										{#if exp.duration}
-											<div class="text-xs text-muted-foreground mt-0.5">{exp.duration}</div>
-										{/if}
-										{#if exp.summary}
-											<p class="text-sm mt-2">{exp.summary}</p>
-										{/if}
-									</div>
-								</div>
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
-			<Separator />
+			<!-- Full-width Applications Section -->
+			<Separator class="my-8" />
 
 			<!-- Applications -->
-			<div class="space-y-3">
+			<div class="space-y-4">
 				<div class="flex items-center justify-between">
-					<h3 class="text-sm font-semibold">Job Applications</h3>
+					<h3 class="text-lg font-semibold">Job Applications</h3>
 					{#if applications.length > 0}
 						<div class="flex items-center gap-2">
 							{#if selectionMode}
@@ -418,66 +427,64 @@
 						<Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
 					</div>
 				{:else if applications.length === 0}
-					<p class="text-sm text-muted-foreground">No applications yet</p>
+					<p class="text-base text-muted-foreground">No applications yet</p>
 				{:else}
-					<div class="space-y-3">
+					<div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
 						{#each applications as app (app.id)}
-							<div class="rounded-lg border p-3 {selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}">
-								<div class="flex items-start justify-between gap-3">
-									<div class="flex items-start gap-2 flex-1">
-										{#if selectionMode}
-											<Checkbox
-												checked={selectedApplications.has(app.id)}
-												onCheckedChange={(checked) => handleSelectionChange(app.id, checked)}
-												class="mt-0.5 h-4 w-4"
-											/>
-										{/if}
-										<div class="space-y-1">
-											<div class="flex items-center gap-2">
-												<Building2 class="h-4 w-4 text-muted-foreground" />
-												<span class="font-medium text-sm">
-													{app.job?.title || 'Unknown Position'}
-												</span>
-												<Badge variant={getStatusVariant(app.status)} class="capitalize text-xs">
-													{app.status}
-												</Badge>
-											</div>
-											{#if app.job?.company_name}
-												<p class="text-xs text-muted-foreground">{app.job.company_name}</p>
-											{/if}
-											<p class="text-xs text-muted-foreground">
-												Applied {formatDate(app.created_at)}
-											</p>
+							<div class="rounded-lg border p-4 {selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}">
+								<div class="flex items-start gap-3">
+									{#if selectionMode}
+										<Checkbox
+											checked={selectedApplications.has(app.id)}
+											onCheckedChange={(checked) => handleSelectionChange(app.id, checked)}
+											class="mt-1 h-5 w-5"
+										/>
+									{/if}
+									<div class="flex-1 space-y-2">
+										<div class="flex items-center gap-2 flex-wrap">
+											<Building2 class="h-5 w-5 text-muted-foreground" />
+											<span class="font-semibold text-base">
+												{app.job?.title || 'Unknown Position'}
+											</span>
 										</div>
-									</div>
-									{#if !selectionMode}
-										<div class="flex gap-2">
-											{#if app.has_resume}
+										<Badge variant={getStatusVariant(app.status)} class="capitalize">
+											{app.status}
+										</Badge>
+										{#if app.job?.company_name}
+											<p class="text-sm text-muted-foreground">{app.job.company_name}</p>
+										{/if}
+										<p class="text-sm text-muted-foreground">
+											Applied {formatDate(app.created_at)}
+										</p>
+										{#if app.has_resume && app.resume_filename}
+											<div class="flex items-center gap-1.5 text-sm text-muted-foreground">
+												<FileText class="h-4 w-4" />
+												<span>{app.resume_filename}</span>
+											</div>
+										{/if}
+										{#if !selectionMode}
+											<div class="flex gap-2 pt-2">
+												{#if app.has_resume}
+													<Button
+														variant="outline"
+														size="sm"
+														onclick={() => openResumePreview(app.id, app.resume_filename)}
+													>
+														<Eye class="mr-1.5 h-4 w-4" />
+														View Resume
+													</Button>
+												{/if}
 												<Button
 													variant="outline"
 													size="sm"
-													onclick={() => openResumePreview(app.id, app.resume_filename)}
+													onclick={() => confirmDeleteApplication(app.id)}
 												>
-													<Eye class="mr-1 h-3 w-3" />
-													View Resume
+													<Trash2 class="h-4 w-4" />
 												</Button>
-											{/if}
-											<Button
-												variant="outline"
-												size="sm"
-												onclick={() => confirmDeleteApplication(app.id)}
-											>
-												<Trash2 class="h-3 w-3" />
-											</Button>
-										</div>
-									{/if}
-								</div>
-								{#if app.has_resume && app.resume_filename}
-									<div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground {selectionMode ? 'ml-6' : ''}">
-										<FileText class="h-3 w-3" />
-										<span>{app.resume_filename}</span>
+											</div>
+										{/if}
 									</div>
-								{/if}
+								</div>
 							</div>
 						{/each}
 					</div>
