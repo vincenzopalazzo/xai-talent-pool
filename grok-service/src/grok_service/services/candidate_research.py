@@ -4,6 +4,7 @@ import logging
 from datetime import datetime, timezone
 from enum import Enum
 
+import grpc
 from pydantic import BaseModel, Field
 from xai_sdk import Client
 from xai_sdk.chat import system, user
@@ -317,7 +318,48 @@ class CandidateResearchService:
         )
         logger.info("=" * 70)
 
-        response = chat.sample()
+        try:
+            response = chat.sample()
+        except grpc.RpcError as e:
+            # Handle gRPC errors (including DEADLINE_EXCEEDED)
+            status_code = e.code() if hasattr(e, "code") else "UNKNOWN"
+            details = e.details() if hasattr(e, "details") else str(e)
+            logger.error("=" * 70)
+            logger.error("CANDIDATE RESEARCH: gRPC error for %s", platform_display)
+            logger.error("Status code: %s", status_code)
+            logger.error("Details: %s", details)
+            logger.error("=" * 70)
+
+            # Return a report with error information
+            error_msg = f"gRPC error: {status_code} - {details}"
+            return PlatformReport(
+                platform=platform_display,
+                person_name=person_name,
+                tldr=f"Error: {status_code}",
+                raw_content=f"## Error\n\nFailed to research {person_name} on "
+                f"{platform_display}.\n\n**Error:** {error_msg}\n\n"
+                "This may be due to API timeout or rate limiting. "
+                "Please try again later.",
+                completion_tokens=0,
+                reasoning_tokens=0,
+            )
+        except Exception as e:
+            # Handle any other unexpected errors
+            logger.exception(
+                "CANDIDATE RESEARCH: Unexpected error for %s: %s",
+                platform_display,
+                e,
+            )
+            return PlatformReport(
+                platform=platform_display,
+                person_name=person_name,
+                tldr="Error: Unexpected failure",
+                raw_content=f"## Error\n\nFailed to research {person_name} on "
+                f"{platform_display}.\n\n**Error:** {str(e)}\n\n"
+                "Please try again later.",
+                completion_tokens=0,
+                reasoning_tokens=0,
+            )
 
         logger.info("=" * 70)
         logger.info("CANDIDATE RESEARCH: Response received for %s", platform_display)

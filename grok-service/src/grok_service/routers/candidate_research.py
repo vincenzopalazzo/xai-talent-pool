@@ -205,6 +205,22 @@ async def _search_platform(
         service = CandidateResearchService()
         report = service.search_platform(person_name, platform, email, profile_url)
 
+        # Check if report indicates an error (TLDR starts with "Error:")
+        is_error_report = report.tldr.startswith("Error:") if report.tldr else False
+        if is_error_report:
+            logger.warning(
+                "%s research returned error report for %s: %s",
+                platform.value,
+                person_name,
+                report.tldr,
+            )
+            # Return as failure so Rust client knows research failed
+            return ResearchResponse(
+                success=False,
+                report=report,  # Still include report for error details
+                error=report.tldr,
+            )
+
         logger.info("Completed %s research for: %s", platform.value, person_name)
 
         document_id = None
