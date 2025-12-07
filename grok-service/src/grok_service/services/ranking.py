@@ -7,7 +7,8 @@ improve ranking quality.
 """
 
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
+
 import numpy as np
 from xai_sdk import Client
 
@@ -47,7 +48,7 @@ class GRPORankingService:
         job: Dict,
         candidates: List[Dict],
         feedback_data: Optional[List[Dict]] = None,
-        use_feedback: bool = True
+        use_feedback: bool = True,
     ) -> List[Dict]:
         """
         Rank candidates for a job using GRPO algorithm.
@@ -72,11 +73,13 @@ class GRPORankingService:
             match_factors = self._compute_match_factors(job, candidate)
             base_score = self._compute_base_score(match_factors)
 
-            scored_candidates.append({
-                "candidate": candidate,
-                "match_factors": match_factors,
-                "base_score": base_score,
-            })
+            scored_candidates.append(
+                {
+                    "candidate": candidate,
+                    "match_factors": match_factors,
+                    "base_score": base_score,
+                }
+            )
 
         # Step 2: Apply RLHF feedback adjustment
         if use_feedback and feedback_data:
@@ -100,9 +103,17 @@ class GRPORankingService:
         """Compute individual match factors between job and candidate."""
 
         # Skills match
-        job_skills = set(skill.strip().lower() for skill in job.get("skills_required", "").split(","))
-        candidate_skills = set(skill.strip().lower() for skill in candidate.get("skills", "").split(","))
-        skills_match = len(job_skills & candidate_skills) / max(len(job_skills), 1) if job_skills else 0.0
+        job_skills = set(
+            skill.strip().lower() for skill in job.get("skills_required", "").split(",")
+        )
+        candidate_skills = set(
+            skill.strip().lower() for skill in candidate.get("skills", "").split(",")
+        )
+        skills_match = (
+            len(job_skills & candidate_skills) / max(len(job_skills), 1)
+            if job_skills
+            else 0.0
+        )
 
         # Experience level match
         experience_levels = {"entry": 1, "mid": 2, "senior": 3, "lead": 4}
@@ -113,7 +124,9 @@ class GRPORankingService:
         candidate_level = 1
         if "senior" in candidate_exp or "lead" in candidate_exp:
             candidate_level = 3
-        elif "mid" in candidate_exp or any(str(i) in candidate_exp for i in range(3, 8)):
+        elif "mid" in candidate_exp or any(
+            str(i) in candidate_exp for i in range(3, 8)
+        ):
             candidate_level = 2
 
         experience_match = 1.0 - min(abs(job_level - candidate_level) / 4, 1.0)
@@ -132,7 +145,11 @@ class GRPORankingService:
         candidate_title = candidate.get("title", "").lower()
         title_words = set(job_title.split())
         candidate_words = set(candidate_title.split())
-        title_match = len(title_words & candidate_words) / max(len(title_words), 1) if title_words else 0.0
+        title_match = (
+            len(title_words & candidate_words) / max(len(title_words), 1)
+            if title_words
+            else 0.0
+        )
 
         return {
             "skills_match": min(skills_match, 1.0),
@@ -145,27 +162,24 @@ class GRPORankingService:
     def _compute_base_score(self, match_factors: Dict[str, float]) -> float:
         """Compute weighted base score from match factors."""
         score = (
-            match_factors["skills_match"] * self.weights["skills_match"] +
-            match_factors["experience_match"] * self.weights["experience_match"] +
-            match_factors["location_match"] * self.weights["location_match"] +
-            match_factors["title_match"] * self.weights["title_match"]
+            match_factors["skills_match"] * self.weights["skills_match"]
+            + match_factors["experience_match"] * self.weights["experience_match"]
+            + match_factors["location_match"] * self.weights["location_match"]
+            + match_factors["title_match"] * self.weights["title_match"]
         )
 
         # Normalize to 0-1 range
         base_weight_sum = (
-            self.weights["skills_match"] +
-            self.weights["experience_match"] +
-            self.weights["location_match"] +
-            self.weights["title_match"]
+            self.weights["skills_match"]
+            + self.weights["experience_match"]
+            + self.weights["location_match"]
+            + self.weights["title_match"]
         )
 
         return score / base_weight_sum if base_weight_sum > 0 else 0.0
 
     def _apply_feedback_adjustment(
-        self,
-        scored_candidates: List[Dict],
-        feedback_data: List[Dict],
-        job_id: str
+        self, scored_candidates: List[Dict], feedback_data: List[Dict], job_id: str
     ) -> List[Dict]:
         """Apply RLHF feedback to adjust candidate scores."""
 
@@ -201,8 +215,10 @@ class GRPORankingService:
                 # Adjust base score
                 item["feedback_score"] = feedback_adjustment
                 item["adjusted_score"] = (
-                    item["base_score"] * (1 - self.feedback_weight) +
-                    (feedback_adjustment + 1) / 2 * self.feedback_weight  # Normalize to 0-1
+                    item["base_score"] * (1 - self.feedback_weight)
+                    + (feedback_adjustment + 1)
+                    / 2
+                    * self.feedback_weight  # Normalize to 0-1
                 )
 
                 logger.debug(
@@ -227,10 +243,12 @@ class GRPORankingService:
             return []
 
         # Use adjusted scores if available, otherwise base scores
-        scores = np.array([
-            item.get("adjusted_score", item["base_score"])
-            for item in scored_candidates
-        ])
+        scores = np.array(
+            [
+                item.get("adjusted_score", item["base_score"])
+                for item in scored_candidates
+            ]
+        )
 
         # Apply softmax to get relative probabilities
         # This is the core of GRPO - ranking based on relative preference
@@ -271,22 +289,28 @@ class GRPORankingService:
         if not feedback_batch:
             return
 
-        logger.info(f"Updating GRPO weights from {len(feedback_batch)} feedback samples")
+        logger.info(
+            f"Updating GRPO weights from {len(feedback_batch)} feedback samples"
+        )
 
         # Aggregate feedback signals
-        positive_feedback = [f for f in feedback_batch if f.get("feedback_type") == "upvote"]
-        negative_feedback = [f for f in feedback_batch if f.get("feedback_type") == "downvote"]
+        positive_feedback = [
+            f for f in feedback_batch if f.get("feedback_type") == "upvote"
+        ]
+        # Note: negative_feedback not currently used but may be needed for future analysis
 
         # Adjust feedback weight based on feedback volume
         total_feedback = len(feedback_batch)
-        positive_ratio = len(positive_feedback) / total_feedback if total_feedback > 0 else 0.5
+        positive_ratio = (
+            len(positive_feedback) / total_feedback if total_feedback > 0 else 0.5
+        )
 
         # Update feedback weight using gradient descent
         gradient = (positive_ratio - 0.5) * self.learning_rate
         self.weights["feedback_score"] = np.clip(
             self.weights["feedback_score"] + gradient,
             0.05,  # Min weight
-            0.30   # Max weight
+            0.30,  # Max weight
         )
 
         # Renormalize weights

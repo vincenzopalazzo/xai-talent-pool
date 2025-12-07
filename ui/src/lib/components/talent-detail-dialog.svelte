@@ -26,7 +26,7 @@
 		Sparkles
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
-	import type { Talent, Application, Job, ExperienceSummary, SocialMediaAnalysis } from '$lib/types';
+	import type { Talent, Application, Job, ExperienceSummary, SocialMediaAnalysis, CandidateScoreDetails } from '$lib/types';
 
 	let {
 		talent,
@@ -219,6 +219,52 @@
 			return null;
 		}
 	});
+
+	// Parse candidate score details from JSON string
+	const candidateScoreDetails = $derived(() => {
+		if (!talent.candidate_score_details) return null;
+		try {
+			return JSON.parse(talent.candidate_score_details) as CandidateScoreDetails;
+		} catch {
+			return null;
+		}
+	});
+
+	// Get score color based on value
+	const getScoreColor = (score: number) => {
+		if (score >= 75) return 'text-green-600 dark:text-green-400';
+		if (score >= 60) return 'text-blue-600 dark:text-blue-400';
+		if (score >= 45) return 'text-yellow-600 dark:text-yellow-400';
+		return 'text-red-600 dark:text-red-400';
+	};
+
+	// Get recommendation badge variant
+	const getRecommendationVariant = (rec: string) => {
+		switch (rec) {
+			case 'strong_yes':
+				return 'default';
+			case 'yes':
+				return 'secondary';
+			case 'maybe':
+				return 'outline';
+			default:
+				return 'destructive';
+		}
+	};
+
+	// Format recommendation text
+	const formatRecommendation = (rec: string) => {
+		switch (rec) {
+			case 'strong_yes':
+				return 'Strong Yes';
+			case 'yes':
+				return 'Yes';
+			case 'maybe':
+				return 'Maybe';
+			default:
+				return 'No';
+		}
+	};
 
 	// Check if there are any social links
 	const hasSocialLinks = $derived(() => {
@@ -415,6 +461,79 @@
 										{/if}
 									</div>
 								{/each}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Candidate Score -->
+					{#if talent.candidate_score !== undefined && talent.candidate_score !== null}
+						<div class="space-y-4 mt-6">
+							<h3 class="text-lg font-semibold flex items-center gap-2">
+								<Sparkles class="h-4 w-4 text-primary" />
+								Fit Score
+							</h3>
+
+							<div class="rounded-lg border p-4">
+								<div class="flex items-center justify-between mb-4">
+									<div class="flex items-center gap-3">
+										<span class={`text-3xl font-bold ${getScoreColor(talent.candidate_score)}`}>
+											{Math.round(talent.candidate_score)}
+										</span>
+										<span class="text-sm text-muted-foreground">/ 100</span>
+									</div>
+									{#if candidateScoreDetails()?.recommendation}
+										<Badge variant={getRecommendationVariant(candidateScoreDetails()!.recommendation)}>
+											{formatRecommendation(candidateScoreDetails()!.recommendation)}
+										</Badge>
+									{/if}
+								</div>
+
+								{#if candidateScoreDetails()?.summary}
+									<p class="text-sm text-muted-foreground mb-4">{candidateScoreDetails()?.summary}</p>
+								{/if}
+
+								{#if candidateScoreDetails()?.breakdown}
+									<div class="grid grid-cols-2 gap-3 text-sm">
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Skills</span>
+											<span class="font-medium">{Math.round(candidateScoreDetails()!.breakdown.skills_match)}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Experience</span>
+											<span class="font-medium">{Math.round(candidateScoreDetails()!.breakdown.experience_fit)}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Culture</span>
+											<span class="font-medium">{Math.round(candidateScoreDetails()!.breakdown.culture_fit)}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="text-muted-foreground">Overall</span>
+											<span class="font-medium">{Math.round(candidateScoreDetails()!.breakdown.overall_impression)}</span>
+										</div>
+									</div>
+								{/if}
+
+								{#if candidateScoreDetails()?.strengths && candidateScoreDetails()!.strengths.length > 0}
+									<div class="mt-4 pt-4 border-t">
+										<p class="text-xs font-medium text-green-600 dark:text-green-400 mb-2">Strengths</p>
+										<ul class="list-disc list-inside text-sm text-muted-foreground space-y-1">
+											{#each candidateScoreDetails()!.strengths.slice(0, 3) as strength}
+												<li>{strength}</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
+
+								{#if candidateScoreDetails()?.concerns && candidateScoreDetails()!.concerns.length > 0}
+									<div class="mt-4 pt-4 border-t">
+										<p class="text-xs font-medium text-amber-600 dark:text-amber-400 mb-2">Concerns</p>
+										<ul class="list-disc list-inside text-sm text-muted-foreground space-y-1">
+											{#each candidateScoreDetails()!.concerns.slice(0, 3) as concern}
+												<li>{concern}</li>
+											{/each}
+										</ul>
+									</div>
+								{/if}
 							</div>
 						</div>
 					{/if}

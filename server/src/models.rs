@@ -28,6 +28,9 @@ pub struct Talent {
     // Social Media Analysis
     pub social_analysis: Option<String>, // JSON string of analysis
     pub x_handle_discovered: Option<String>,
+    // Candidate Scoring
+    pub candidate_score: Option<f64>,
+    pub candidate_score_details: Option<String>, // JSON string of scoring breakdown
 }
 
 #[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]

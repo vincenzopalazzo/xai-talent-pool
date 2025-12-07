@@ -296,15 +296,19 @@ Respond with this exact JSON structure:
                 collection_service = CollectionService()
                 document_name = f"social_media_analysis_{timestamp}.json"
                 json_data = result.model_dump_json().encode("utf-8")
-                
-                logger.info("SOCIAL MEDIA: Uploading analysis to collection %s", collection_id)
+
+                logger.info(
+                    "SOCIAL MEDIA: Uploading analysis to collection %s", collection_id
+                )
                 collection_service.upload_document(
                     collection_id=collection_id,
                     name=document_name,
                     data=json_data,
                 )
             except Exception as e:
-                logger.error("SOCIAL MEDIA: Failed to upload analysis to collection: %s", e)
+                logger.error(
+                    "SOCIAL MEDIA: Failed to upload analysis to collection: %s", e
+                )
                 # We don't fail the whole request if upload fails, just log it
 
         return result
@@ -347,7 +351,9 @@ Respond with this exact JSON structure:
             logger.error("SOCIAL MEDIA: Error generating summary: %s", e)
             return None
 
-    def _generate_platform_tldr(self, platform: str, analysis: "PlatformAnalysis") -> str | None:
+    def _generate_platform_tldr(
+        self, platform: str, analysis: "PlatformAnalysis"
+    ) -> str | None:
         """Generate a TLDR summary for a specific platform analysis."""
         if not analysis.recruiter_notes and not analysis.highlights:
             return None
@@ -369,11 +375,17 @@ Respond with this exact JSON structure:
         if analysis.bio:
             context_parts.append(f"Bio: {analysis.bio}")
         if analysis.highlights:
-            context_parts.append(f"Key highlights: {'; '.join(analysis.highlights[:3])}")
+            context_parts.append(
+                f"Key highlights: {'; '.join(analysis.highlights[:3])}"
+            )
         if analysis.experience_signals:
-            context_parts.append(f"Experience signals: {'; '.join(analysis.experience_signals[:2])}")
+            context_parts.append(
+                f"Experience signals: {'; '.join(analysis.experience_signals[:2])}"
+            )
         if analysis.recruiter_notes:
-            context_parts.append(f"Recruiter notes: {'; '.join(analysis.recruiter_notes[:2])}")
+            context_parts.append(
+                f"Recruiter notes: {'; '.join(analysis.recruiter_notes[:2])}"
+            )
 
         if not context_parts:
             return None
@@ -388,7 +400,9 @@ Respond with this exact JSON structure:
             logger.error("SOCIAL MEDIA: Error generating platform TLDR: %s", e)
             return None
 
-    def _generate_overall_tldr(self, name: str, profiles: list[PlatformProfile]) -> str | None:
+    def _generate_overall_tldr(
+        self, name: str, profiles: list[PlatformProfile]
+    ) -> str | None:
         """Generate an overall TLDR summary from all platform analyses."""
         if not profiles:
             return None
@@ -399,7 +413,9 @@ Respond with this exact JSON structure:
             if profile.tldr:
                 all_insights.append(f"[{profile.platform}] {profile.tldr}")
             elif profile.recruiter_notes:
-                all_insights.append(f"[{profile.platform}] {'; '.join(profile.recruiter_notes[:2])}")
+                all_insights.append(
+                    f"[{profile.platform}] {'; '.join(profile.recruiter_notes[:2])}"
+                )
 
         if not all_insights:
             return None
@@ -418,7 +434,11 @@ Respond with this exact JSON structure:
         )
 
         insights_text = "\n".join(all_insights)
-        chat.append(user(f"Candidate: {name}\n\nPlatform Insights:\n{insights_text}\n\nOverall TLDR:"))
+        chat.append(
+            user(
+                f"Candidate: {name}\n\nPlatform Insights:\n{insights_text}\n\nOverall TLDR:"
+            )
+        )
 
         try:
             response = chat.sample()

@@ -2,7 +2,8 @@
 
 import logging
 from typing import List, Optional
-from fastapi import APIRouter, HTTPException, Depends
+
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from xai_sdk import Client
 
@@ -40,7 +41,9 @@ class RankCandidatesRequest(BaseModel):
 
 
 class UpdateWeightsRequest(BaseModel):
-    feedback_batch: List[dict] = Field(..., description="Batch of feedback for weight updates")
+    feedback_batch: List[dict] = Field(
+        ..., description="Batch of feedback for weight updates"
+    )
 
 
 class RankingStatsResponse(BaseModel):
@@ -61,7 +64,7 @@ def get_ranking_service() -> GRPORankingService:
 @router.post("/rank", response_model=List[RankedCandidateResponse])
 async def rank_candidates(
     request: RankCandidatesRequest,
-    ranking_service: GRPORankingService = Depends(get_ranking_service)
+    ranking_service: GRPORankingService = Depends(get_ranking_service),
 ):
     """
     Rank candidates for a job using GRPO algorithm with RLHF feedback.
@@ -77,19 +80,21 @@ async def rank_candidates(
             job=request.job,
             candidates=request.candidates,
             feedback_data=request.feedback_data,
-            use_feedback=request.use_feedback
+            use_feedback=request.use_feedback,
         )
 
         response = []
         for item in ranked:
-            response.append(RankedCandidateResponse(
-                candidate=item["candidate"],
-                rank_score=item["rank_score"],
-                rank_position=item["rank_position"],
-                confidence=item["confidence"],
-                match_factors=MatchFactorsResponse(**item["match_factors"]),
-                feedback_score=item.get("feedback_score")
-            ))
+            response.append(
+                RankedCandidateResponse(
+                    candidate=item["candidate"],
+                    rank_score=item["rank_score"],
+                    rank_position=item["rank_position"],
+                    confidence=item["confidence"],
+                    match_factors=MatchFactorsResponse(**item["match_factors"]),
+                    feedback_score=item.get("feedback_score"),
+                )
+            )
 
         logger.info(
             f"Ranked {len(response)} candidates for job {request.job.get('id')} "
@@ -106,7 +111,7 @@ async def rank_candidates(
 @router.post("/update-weights")
 async def update_weights(
     request: UpdateWeightsRequest,
-    ranking_service: GRPORankingService = Depends(get_ranking_service)
+    ranking_service: GRPORankingService = Depends(get_ranking_service),
 ):
     """
     Update GRPO model weights based on feedback batch.
@@ -121,11 +126,12 @@ async def update_weights(
     try:
         ranking_service.update_weights_from_feedback(request.feedback_batch)
 
+        feedback_count = len(request.feedback_batch)
         return {
             "status": "success",
-            "message": f"Updated weights from {len(request.feedback_batch)} feedback samples",
+            "message": f"Updated weights from {feedback_count} feedback samples",
             "current_weights": ranking_service.weights,
-            "model_version": ranking_service.model_version
+            "model_version": ranking_service.model_version,
         }
 
     except Exception as e:
@@ -135,14 +141,14 @@ async def update_weights(
 
 @router.get("/stats", response_model=RankingStatsResponse)
 async def get_ranking_stats(
-    ranking_service: GRPORankingService = Depends(get_ranking_service)
+    ranking_service: GRPORankingService = Depends(get_ranking_service),
 ):
     """Get current ranking model statistics and configuration."""
     return RankingStatsResponse(
         total_candidates=0,  # Would come from external API
         avg_confidence=0.0,  # Would be computed from recent rankings
         model_version=ranking_service.model_version,
-        current_weights=ranking_service.weights
+        current_weights=ranking_service.weights,
     )
 
 
