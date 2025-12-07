@@ -12,10 +12,11 @@
 		ExternalLink,
 		CheckCircle2,
 		FileText,
-		Download,
+		Eye,
 		Loader2,
 		Building2
 	} from 'lucide-svelte';
+	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Talent, Application, Job } from '$lib/types';
 
 	let {
@@ -32,6 +33,11 @@
 	}
 	let applications = $state<ApplicationWithJob[]>([]);
 	let isLoadingApplications = $state(false);
+
+	// PDF preview state
+	let previewDialogOpen = $state(false);
+	let previewApplicationId = $state<string>('');
+	let previewFilename = $state<string>('Resume');
 
 	// Fetch applications when dialog opens
 	$effect(() => {
@@ -72,8 +78,10 @@
 		}
 	}
 
-	function downloadResume(applicationId: string) {
-		window.open(`http://localhost:8080/api/v1/applications/${applicationId}/resume`, '_blank');
+	function openResumePreview(applicationId: string, filename?: string) {
+		previewApplicationId = applicationId;
+		previewFilename = filename || 'Resume';
+		previewDialogOpen = true;
 	}
 
 	// Parse skills from comma-separated string or array
@@ -222,10 +230,10 @@
 										<Button
 											variant="outline"
 											size="sm"
-											onclick={() => downloadResume(app.id)}
+											onclick={() => openResumePreview(app.id, app.resume_filename)}
 										>
-											<Download class="mr-1 h-3 w-3" />
-											Resume
+											<Eye class="mr-1 h-3 w-3" />
+											View Resume
 										</Button>
 									{/if}
 								</div>
@@ -253,3 +261,9 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<PdfPreviewDialog
+	applicationId={previewApplicationId}
+	filename={previewFilename}
+	bind:open={previewDialogOpen}
+/>

@@ -6,7 +6,7 @@
 	import { Separator } from '$lib/components/ui/separator';
 	import {
 		FileText,
-		Download,
+		Eye,
 		User,
 		Mail,
 		Calendar,
@@ -15,6 +15,7 @@
 		ChevronUp,
 		ExternalLink
 	} from 'lucide-svelte';
+	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Job, Application, Talent } from '$lib/types';
 
 	let {
@@ -29,6 +30,11 @@
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let expandedCoverLetters = $state<Set<string>>(new Set());
+
+	// PDF preview state
+	let previewDialogOpen = $state(false);
+	let previewApplicationId = $state<string>('');
+	let previewFilename = $state<string>('Resume');
 
 	// Fetch applications when dialog opens
 	$effect(() => {
@@ -73,9 +79,10 @@
 		}
 	}
 
-	function downloadResume(applicationId: string, filename: string) {
-		// Open the resume download URL in a new tab
-		window.open(`http://localhost:8080/api/v1/applications/${applicationId}/resume`, '_blank');
+	function openResumePreview(applicationId: string, filename: string) {
+		previewApplicationId = applicationId;
+		previewFilename = filename || 'Resume';
+		previewDialogOpen = true;
 	}
 
 	function toggleCoverLetter(id: string) {
@@ -181,10 +188,10 @@
 										<Button
 											variant="outline"
 											size="sm"
-											onclick={() => downloadResume(app.id, app.resume_filename || 'resume')}
+											onclick={() => openResumePreview(app.id, app.resume_filename || 'resume')}
 										>
-											<Download class="mr-2 h-4 w-4" />
-											Resume
+											<Eye class="mr-2 h-4 w-4" />
+											View Resume
 										</Button>
 									{/if}
 								</div>
@@ -230,3 +237,9 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<PdfPreviewDialog
+	applicationId={previewApplicationId}
+	filename={previewFilename}
+	bind:open={previewDialogOpen}
+/>
