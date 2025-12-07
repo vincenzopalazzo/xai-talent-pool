@@ -103,6 +103,19 @@ pub struct BulkDeleteResponse {
     pub total_requested: usize,
 }
 
+#[derive(Deserialize, Apiv2Schema)]
+pub struct TriggerScoringRequest {
+    pub job_id: String,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct TriggerScoringResponse {
+    pub success: bool,
+    pub message: String,
+    pub score: Option<f64>,
+    pub recommendation: Option<String>,
+}
+
 // Job models
 
 #[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]

@@ -4,7 +4,7 @@ use paperclip::actix::{self, OpenApiExt, HttpResponseWrapper};
 use log::info;
 
 use super::talents::{
-    get_talents, create_talent, get_talent, get_talent_by_email, update_talent, delete_talent, delete_talents_bulk,
+    get_talents, create_talent, get_talent, get_talent_by_email, update_talent, delete_talent, delete_talents_bulk, trigger_scoring,
 };
 use super::jobs::{
     get_jobs, create_job, get_job, update_job, delete_job,
@@ -102,6 +102,7 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str, gro
             .service(update_talent)
             .service(delete_talent)
             .service(delete_talents_bulk)
+            .service(trigger_scoring)
             // Job routes
             .service(get_jobs)
             .service(create_job)

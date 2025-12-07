@@ -4,8 +4,8 @@ use uuid::Uuid;
 use chrono::Utc;
 use log::{info, error};
 
-use crate::models::{Talent, CreateTalentRequest, UpdateTalentRequest, ApiError, BulkDeleteRequest, BulkDeleteResponse};
-use crate::grok_client::GrokClient;
+use crate::models::{Talent, CreateTalentRequest, UpdateTalentRequest, ApiError, BulkDeleteRequest, BulkDeleteResponse, TriggerScoringRequest, TriggerScoringResponse};
+use crate::grok_client::{GrokClient, CandidateScoringRequest, JobInfoForScoring};
 use super::server::AppState;
 
 #[api_v2_operation]
@@ -198,4 +198,146 @@ pub async fn delete_talents_bulk(
         deleted_count,
         total_requested: ids.len(),
     }))
+}
+
+#[api_v2_operation]
+#[paperclip::actix::post("/api/v1/talents/{id}/score", summary = "Trigger candidate scoring for a talent against a job")]
+pub async fn trigger_scoring(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+    json: web::Json<TriggerScoringRequest>,
+) -> ActixResult<HttpResponse> {
+    let talent_id = path.into_inner();
+    let pool = &data.db_pool;
+
+    info!("======================================================================");
+    info!("TRIGGER SCORING: Request received");
+    info!("Talent ID: {}", talent_id);
+    info!("Job ID: {}", json.job_id);
+    info!("======================================================================");
+
+    // Get talent
+    let talent = match crate::database::get_talent_by_id(pool, talent_id.clone()).await {
+        Ok(Some(t)) => t,
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(TriggerScoringResponse {
+                success: false,
+                message: "Talent not found".to_string(),
+                score: None,
+                recommendation: None,
+            }));
+        }
+        Err(e) => {
+            error!("Failed to get talent: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(TriggerScoringResponse {
+                success: false,
+                message: format!("Database error: {}", e),
+                score: None,
+                recommendation: None,
+            }));
+        }
+    };
+
+    // Check if talent has a collection
+    let collection_id = match &talent.collection_id {
+        Some(id) => id.clone(),
+        None => {
+            return Ok(HttpResponse::BadRequest().json(TriggerScoringResponse {
+                success: false,
+                message: "Talent does not have a collection. Please upload a resume first.".to_string(),
+                score: None,
+                recommendation: None,
+            }));
+        }
+    };
+
+    // Get job
+    let job = match crate::database::get_job_by_id(pool, json.job_id.clone()).await {
+        Ok(Some(j)) => j,
+        Ok(None) => {
+            return Ok(HttpResponse::NotFound().json(TriggerScoringResponse {
+                success: false,
+                message: "Job not found".to_string(),
+                score: None,
+                recommendation: None,
+            }));
+        }
+        Err(e) => {
+            error!("Failed to get job: {}", e);
+            return Ok(HttpResponse::InternalServerError().json(TriggerScoringResponse {
+                success: false,
+                message: format!("Database error: {}", e),
+                score: None,
+                recommendation: None,
+            }));
+        }
+    };
+
+    // Call Grok scoring service
+    let client = GrokClient::new(&data.grok_service_url);
+
+    let scoring_request = CandidateScoringRequest {
+        talent_id: talent.id.clone(),
+        collection_id,
+        job: JobInfoForScoring {
+            id: job.id.clone(),
+            title: job.title.clone(),
+            description: job.description.clone(),
+            company_name: job.company_name.clone(),
+            skills_required: job.skills_required.clone(),
+            experience_level: job.experience_level.clone(),
+            location: job.location.clone(),
+            location_type: job.location_type.clone(),
+        },
+        candidate_name: talent.name.clone(),
+        candidate_title: talent.title.clone(),
+        candidate_skills: talent.skills.clone(),
+    };
+
+    match client.score_candidate(&scoring_request).await {
+        Ok(response) => {
+            if response.success {
+                if let Some(result) = response.result {
+                    info!("TRIGGER SCORING: Success!");
+                    info!("Score: {}", result.overall_score);
+                    info!("Recommendation: {}", result.recommendation);
+
+                    // Store the scoring result
+                    let scoring_json = serde_json::to_string(&result).ok();
+
+                    if let Err(e) = crate::database::update_talent_candidate_score(
+                        pool,
+                        talent.id.clone(),
+                        result.overall_score,
+                        scoring_json,
+                    ).await {
+                        error!("Failed to update talent score: {}", e);
+                    }
+
+                    return Ok(HttpResponse::Ok().json(TriggerScoringResponse {
+                        success: true,
+                        message: "Scoring completed successfully".to_string(),
+                        score: Some(result.overall_score),
+                        recommendation: Some(result.recommendation),
+                    }));
+                }
+            }
+
+            Ok(HttpResponse::InternalServerError().json(TriggerScoringResponse {
+                success: false,
+                message: response.error.unwrap_or_else(|| "Scoring failed".to_string()),
+                score: None,
+                recommendation: None,
+            }))
+        }
+        Err(e) => {
+            error!("TRIGGER SCORING: Error - {}", e);
+            Ok(HttpResponse::InternalServerError().json(TriggerScoringResponse {
+                success: false,
+                message: format!("Scoring service error: {}", e),
+                score: None,
+                recommendation: None,
+            }))
+        }
+    }
 }

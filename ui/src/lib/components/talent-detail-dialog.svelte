@@ -59,15 +59,83 @@
 	let bulkDeleteDialogOpen = $state(false);
 	let isBulkDeleting = $state(false);
 
+	// Scoring state
+	let isCalculatingScore = $state(false);
+	let scoringError = $state<string | null>(null);
+	let availableJobs = $state<Job[]>([]);
+	let selectedJobForScoring = $state<string>('');
+
 	const selectedCount = $derived(selectedApplications.size);
 	const allSelected = $derived(applications.length > 0 && selectedApplications.size === applications.length);
 
-	// Fetch applications when dialog opens
+	// Check if we can calculate score (has collection but no score)
+	const canCalculateScore = $derived(
+		talent.collection_id && (talent.candidate_score === undefined || talent.candidate_score === null)
+	);
+
+	// Fetch applications and jobs when dialog opens
 	$effect(() => {
 		if (open && talent.id) {
 			fetchApplications();
+			fetchJobs();
 		}
 	});
+
+	async function fetchJobs() {
+		try {
+			const response = await fetch('http://localhost:8080/api/v1/jobs');
+			if (response.ok) {
+				const jobs: Job[] = await response.json();
+				// Filter to only active jobs
+				availableJobs = jobs.filter((j) => j.status === 'active');
+				// Auto-select first job if available
+				if (availableJobs.length > 0 && !selectedJobForScoring) {
+					selectedJobForScoring = availableJobs[0].id;
+				}
+			}
+		} catch {
+			// Failed to fetch jobs
+		}
+	}
+
+	async function calculateScore() {
+		if (!selectedJobForScoring) {
+			scoringError = 'Please select a job to score against';
+			return;
+		}
+
+		isCalculatingScore = true;
+		scoringError = null;
+
+		try {
+			const response = await fetch(`http://localhost:8080/api/v1/talents/${talent.id}/score`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ job_id: selectedJobForScoring })
+			});
+
+			const result = await response.json();
+
+			if (result.success) {
+				// Refresh talent data to get the new score
+				const talentResponse = await fetch(`http://localhost:8080/api/v1/talents/${talent.id}`);
+				if (talentResponse.ok) {
+					const updatedTalent = await talentResponse.json();
+					// Update the talent prop (parent should handle this via binding)
+					talent.candidate_score = updatedTalent.candidate_score;
+					talent.candidate_score_details = updatedTalent.candidate_score_details;
+				}
+			} else {
+				scoringError = result.message || 'Failed to calculate score';
+			}
+		} catch (e) {
+			scoringError = 'Failed to connect to scoring service';
+		} finally {
+			isCalculatingScore = false;
+		}
+	}
 
 	async function fetchApplications() {
 		isLoadingApplications = true;
@@ -465,7 +533,7 @@
 						</div>
 					{/if}
 
-					<!-- Candidate Score -->
+					<!-- Candidate Score or Calculate Score -->
 					{#if talent.candidate_score !== undefined && talent.candidate_score !== null}
 						<div class="space-y-4 mt-6">
 							<h3 class="text-lg font-semibold flex items-center gap-2">
@@ -533,6 +601,59 @@
 											{/each}
 										</ul>
 									</div>
+								{/if}
+							</div>
+						</div>
+					{:else if canCalculateScore}
+						<!-- Calculate Score Section -->
+						<div class="space-y-4 mt-6">
+							<h3 class="text-lg font-semibold flex items-center gap-2">
+								<Sparkles class="h-4 w-4 text-primary" />
+								Calculate Fit Score
+							</h3>
+
+							<div class="rounded-lg border p-4 space-y-4">
+								<p class="text-sm text-muted-foreground">
+									This candidate has documents in their collection but no fit score yet.
+									Select a job to calculate their fit score using AI.
+								</p>
+
+								{#if availableJobs.length > 0}
+									<div class="space-y-2">
+										<label for="job-select" class="text-sm font-medium">Select Job</label>
+										<select
+											id="job-select"
+											bind:value={selectedJobForScoring}
+											class="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+											disabled={isCalculatingScore}
+										>
+											{#each availableJobs as job}
+												<option value={job.id}>{job.title} - {job.company_name}</option>
+											{/each}
+										</select>
+									</div>
+
+									{#if scoringError}
+										<p class="text-sm text-destructive">{scoringError}</p>
+									{/if}
+
+									<Button
+										onclick={calculateScore}
+										disabled={isCalculatingScore || !selectedJobForScoring}
+										class="w-full"
+									>
+										{#if isCalculatingScore}
+											<Loader2 class="h-4 w-4 mr-2 animate-spin" />
+											Calculating...
+										{:else}
+											<Sparkles class="h-4 w-4 mr-2" />
+											Calculate Score
+										{/if}
+									</Button>
+								{:else}
+									<p class="text-sm text-muted-foreground">
+										No active jobs available. Create a job posting first.
+									</p>
 								{/if}
 							</div>
 						</div>
