@@ -1,0 +1,1 @@
+SELECT * FROM talents ORDER BY created_at DESC;
