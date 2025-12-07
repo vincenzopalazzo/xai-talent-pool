@@ -4,7 +4,7 @@ use uuid::Uuid;
 use chrono::Utc;
 use log::{info, error};
 
-use crate::models::{Talent, CreateTalentRequest, UpdateTalentRequest, ApiError};
+use crate::models::{Talent, CreateTalentRequest, UpdateTalentRequest, ApiError, BulkDeleteRequest, BulkDeleteResponse};
 use crate::grok_client::GrokClient;
 use super::server::AppState;
 
@@ -167,4 +167,31 @@ async fn delete_talent(
             code: 404,
         }))
     }
+}
+
+#[api_v2_operation]
+#[paperclip::actix::post("/api/v1/talents/bulk-delete", summary = "Delete multiple talents")]
+pub async fn delete_talents_bulk(
+    data: web::Data<AppState>,
+    json: web::Json<BulkDeleteRequest>,
+) -> ActixResult<HttpResponse> {
+    let pool = &data.db_pool;
+    let ids = &json.ids;
+
+    if ids.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(ApiError {
+            message: "No talent IDs provided".to_string(),
+            code: 400,
+        }));
+    }
+
+    info!("Bulk deleting {} talents", ids.len());
+
+    let deleted_count = crate::database::delete_talents_bulk(pool, ids).await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    Ok(HttpResponse::Ok().json(BulkDeleteResponse {
+        deleted_count,
+        total_requested: ids.len(),
+    }))
 }

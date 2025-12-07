@@ -5,6 +5,7 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import TalentDetailDialog from './talent-detail-dialog.svelte';
 	import CandidateFeedback from './candidate-feedback.svelte';
 	import type { Talent } from '$lib/types';
@@ -14,11 +15,28 @@
 		jobId?: string;
 		rankPosition?: number;
 		showFeedback?: boolean;
+		selectable?: boolean;
+		selected?: boolean;
+		onSelectionChange?: (id: string, selected: boolean) => void;
 	}
 
-	let { talent, jobId, rankPosition, showFeedback = false }: Props = $props();
+	let {
+		talent,
+		jobId,
+		rankPosition,
+		showFeedback = false,
+		selectable = false,
+		selected = false,
+		onSelectionChange
+	}: Props = $props();
 	let isSaved = $state<boolean | null>(null);
 	let detailDialogOpen = $state(false);
+
+	function handleCheckboxChange(checked: boolean | 'indeterminate') {
+		if (onSelectionChange && typeof checked === 'boolean') {
+			onSelectionChange(talent.id, checked);
+		}
+	}
 
 	// Parse skills from comma-separated string or array
 	const skills = $derived(() => {
@@ -34,10 +52,17 @@
 	});
 </script>
 
-<Card.Root class="group relative overflow-hidden transition-shadow hover:shadow-lg">
+<Card.Root class="group relative overflow-hidden transition-shadow hover:shadow-lg {selected ? 'ring-2 ring-primary' : ''}">
 	<Card.Header class="pb-3">
 		<div class="flex items-start justify-between">
 			<div class="flex items-center gap-3">
+				{#if selectable}
+					<Checkbox
+						checked={selected}
+						onCheckedChange={handleCheckboxChange}
+						class="h-5 w-5"
+					/>
+				{/if}
 				<Avatar.Root class="h-12 w-12">
 					<Avatar.Image src={talent.avatar} alt={talent.name} />
 					<Avatar.Fallback>{talent.name.slice(0, 2).toUpperCase()}</Avatar.Fallback>

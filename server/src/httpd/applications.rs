@@ -4,7 +4,7 @@ use uuid::Uuid;
 use chrono::Utc;
 use log::{info, error, warn};
 
-use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError};
+use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError, BulkDeleteRequest, BulkDeleteResponse};
 use crate::grok_client::{GrokClient, TalentInfo};
 use super::server::AppState;
 
@@ -437,4 +437,31 @@ pub async fn delete_application(
             Err(actix_web::error::ErrorInternalServerError(e))
         }
     }
+}
+
+#[api_v2_operation]
+#[paperclip::actix::post("/api/v1/applications/bulk-delete", summary = "Delete multiple applications")]
+pub async fn delete_applications_bulk(
+    data: web::Data<AppState>,
+    json: web::Json<BulkDeleteRequest>,
+) -> ActixResult<HttpResponse> {
+    let pool = &data.db_pool;
+    let ids = &json.ids;
+
+    if ids.is_empty() {
+        return Ok(HttpResponse::BadRequest().json(ApiError {
+            message: "No application IDs provided".to_string(),
+            code: 400,
+        }));
+    }
+
+    info!("Bulk deleting {} applications", ids.len());
+
+    let deleted_count = crate::database::delete_applications_bulk(pool, ids).await
+        .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    Ok(HttpResponse::Ok().json(BulkDeleteResponse {
+        deleted_count,
+        total_requested: ids.len(),
+    }))
 }

@@ -4,6 +4,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Separator } from '$lib/components/ui/separator';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import {
 		FileText,
 		Eye,
@@ -13,7 +15,10 @@
 		Loader2,
 		ChevronDown,
 		ChevronUp,
-		ExternalLink
+		ExternalLink,
+		Trash2,
+		CheckSquare,
+		X
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Job, Application, Talent } from '$lib/types';
@@ -30,6 +35,15 @@
 	let isLoading = $state(false);
 	let error = $state<string | null>(null);
 	let expandedCoverLetters = $state<Set<string>>(new Set());
+
+	// Selection state
+	let selectionMode = $state(false);
+	let selectedApplications = $state<Set<string>>(new Set());
+	let deleteDialogOpen = $state(false);
+	let isDeleting = $state(false);
+
+	const selectedCount = $derived(selectedApplications.size);
+	const allSelected = $derived(applications.length > 0 && selectedApplications.size === applications.length);
 
 	// PDF preview state
 	let previewDialogOpen = $state(false);
@@ -119,15 +133,102 @@
 				return 'outline';
 		}
 	};
+
+	// Selection functions
+	function handleSelectionChange(id: string, checked: boolean | 'indeterminate') {
+		if (typeof checked === 'boolean') {
+			if (checked) {
+				selectedApplications.add(id);
+			} else {
+				selectedApplications.delete(id);
+			}
+			selectedApplications = new Set(selectedApplications);
+		}
+	}
+
+	function toggleSelectAll() {
+		if (allSelected) {
+			selectedApplications = new Set();
+		} else {
+			selectedApplications = new Set(applications.map((app) => app.id));
+		}
+	}
+
+	function exitSelectionMode() {
+		selectionMode = false;
+		selectedApplications = new Set();
+	}
+
+	async function bulkDelete() {
+		if (selectedApplications.size === 0) return;
+
+		isDeleting = true;
+		try {
+			const response = await fetch('http://localhost:8080/api/v1/applications/bulk-delete', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ ids: Array.from(selectedApplications) })
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				console.log(`Deleted ${result.deleted_count} of ${result.total_requested} applications`);
+				deleteDialogOpen = false;
+				exitSelectionMode();
+				await fetchApplications();
+			} else {
+				console.error('Failed to delete applications:', response.statusText);
+			}
+		} catch (err) {
+			console.error('Error deleting applications:', err);
+		} finally {
+			isDeleting = false;
+		}
+	}
 </script>
 
 <Dialog.Root bind:open>
 	<Dialog.Content class="max-h-[90vh] max-w-3xl overflow-y-auto">
 		<Dialog.Header>
-			<Dialog.Title>Applications for {job.title}</Dialog.Title>
-			<Dialog.Description>
-				{applications.length} application{applications.length !== 1 ? 's' : ''} received
-			</Dialog.Description>
+			<div class="flex items-center justify-between">
+				<div>
+					<Dialog.Title>Applications for {job.title}</Dialog.Title>
+					<Dialog.Description>
+						{applications.length} application{applications.length !== 1 ? 's' : ''} received
+					</Dialog.Description>
+				</div>
+				{#if applications.length > 0}
+					<div class="flex items-center gap-2">
+						{#if selectionMode}
+							<span class="text-sm text-muted-foreground">
+								{selectedCount} selected
+							</span>
+							<Button variant="ghost" size="sm" onclick={toggleSelectAll}>
+								{allSelected ? 'Deselect All' : 'Select All'}
+							</Button>
+							<Button
+								variant="destructive"
+								size="sm"
+								disabled={selectedCount === 0}
+								onclick={() => (deleteDialogOpen = true)}
+							>
+								<Trash2 class="mr-2 h-4 w-4" />
+								Delete
+							</Button>
+							<Button variant="outline" size="sm" onclick={exitSelectionMode}>
+								<X class="h-4 w-4" />
+							</Button>
+						{:else}
+							<Button variant="outline" size="sm" onclick={() => (selectionMode = true)}>
+								<CheckSquare class="mr-2 h-4 w-4" />
+								Select
+							</Button>
+						{/if}
+					</div>
+				{/if}
+			</div>
 		</Dialog.Header>
 
 		<div class="py-4">
@@ -147,9 +248,16 @@
 			{:else}
 				<div class="space-y-4">
 					{#each applications as app (app.id)}
-						<div class="rounded-lg border p-4">
+						<div class="rounded-lg border p-4 {selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}">
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex items-start gap-3">
+									{#if selectionMode}
+										<Checkbox
+											checked={selectedApplications.has(app.id)}
+											onCheckedChange={(checked) => handleSelectionChange(app.id, checked)}
+											class="mt-1 h-5 w-5"
+										/>
+									{/if}
 									<Avatar.Root class="h-10 w-10">
 										{#if app.talent?.avatar}
 											<Avatar.Image src={app.talent.avatar} alt={app.talent.name} />
@@ -243,3 +351,24 @@
 	filename={previewFilename}
 	bind:open={previewDialogOpen}
 />
+
+<AlertDialog.Root bind:open={deleteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete {selectedCount} application{selectedCount !== 1 ? 's' : ''}?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This action cannot be undone. This will permanently delete the selected application{selectedCount !== 1 ? 's' : ''}.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isDeleting}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={bulkDelete}
+				disabled={isDeleting}
+				class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+			>
+				{isDeleting ? 'Deleting...' : 'Delete'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
