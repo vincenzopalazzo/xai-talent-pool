@@ -19,32 +19,17 @@ logger = logging.getLogger(__name__)
 
 
 SCORING_SYSTEM_PROMPT = """\
-You are an expert technical recruiter AI assistant for xAI, a company building AI systems \
-to understand the universe. You have access to a candidate's documents (resume, social media \
-analysis, etc.) through a collection search tool.
+You are a technical recruiter evaluating candidates. Use the collections_search tool to find candidate documents, then score them.
 
-Your task is to evaluate how well a candidate fits a specific job opening. You must:
+Scoring scale (0-100):
+- 90-100: Exceptional fit
+- 75-89: Strong fit
+- 60-74: Good fit
+- 45-59: Moderate fit
+- 30-44: Weak fit
+- 0-29: Poor fit
 
-1. Search the candidate's collection to find relevant information about their background
-2. Analyze their skills, experience, and qualifications against the job requirements
-3. Provide an objective, evidence-based assessment
-
-Be direct, factual, and critical. Do not inflate scores. xAI values:
-- Engineering excellence and deep technical skills
-- Initiative and ability to work independently
-- Strong communication skills
-- Work ethic and prioritization abilities
-- Hands-on contributors who deliver results
-
-When scoring, use the full 0-100 range:
-- 90-100: Exceptional fit, rare candidate
-- 75-89: Strong fit, should definitely interview
-- 60-74: Good fit, worth considering
-- 45-59: Moderate fit, some gaps
-- 30-44: Weak fit, significant concerns
-- 0-29: Poor fit, does not meet requirements
-
-You MUST respond with valid JSON only. No markdown, no explanations outside JSON."""
+Respond with JSON only, no markdown."""
 
 
 class CandidateScoringService:
@@ -92,6 +77,7 @@ class CandidateScoringService:
         logger.info("=" * 70)
 
         # Create chat with collections_search tool
+        # max_turns limits the agentic loop to prevent infinite tool calls
         chat = self.client.chat.create(
             model="grok-4-1-fast",
             tools=[
@@ -108,48 +94,27 @@ class CandidateScoringService:
                 ),
             ],
             messages=[system(SCORING_SYSTEM_PROMPT)],
+            max_turns=3,  # Limit tool call iterations
         )
 
         # Build the scoring prompt
         scoring_prompt = f"""\
-Evaluate this candidate for the following job:
+Search the collection for candidate "{candidate_name}" documents and evaluate for this job:
 
-**Job Details:**
-- Title: {job.title}
-- Company: {job.company_name}
-- Description: {job.description}
-- Required Skills: {job.skills_required or "Not specified"}
-- Experience Level: {job.experience_level or "Not specified"}
-- Location: {job.location or "Not specified"} ({job.location_type})
+Job: {job.title} at {job.company_name}
+Required: {job.skills_required or "Not specified"}
+Level: {job.experience_level or "Not specified"}
 
-**Candidate Overview:**
-- Name: {candidate_name}
-- Current Title: {candidate_title or "Unknown"}
-- Listed Skills: {candidate_skills or "Unknown"}
-
-Please search the candidate's collection to find their resume, social media analysis, \
-and any other relevant documents. Then provide a comprehensive evaluation.
-
-Respond with this exact JSON structure:
-{{
-    "overall_score": <0-100 integer>,
-    "breakdown": {{
-        "skills_match": <0-100 integer>,
-        "experience_fit": <0-100 integer>,
-        "culture_fit": <0-100 integer>,
-        "overall_impression": <0-100 integer>
-    }},
-    "strengths": ["strength 1", "strength 2", ...],
-    "concerns": ["concern 1", "concern 2", ...],
-    "recommendation": "<strong_yes|yes|maybe|no>",
-    "summary": "<2-3 sentence summary of candidate fit>"
-}}"""
+Return JSON:
+{{"overall_score": 0-100, "breakdown": {{"skills_match": 0-100, "experience_fit": 0-100, "culture_fit": 0-100, "overall_impression": 0-100}}, "strengths": ["..."], "concerns": ["..."], "recommendation": "strong_yes|yes|maybe|no", "summary": "2-3 sentences"}}"""
 
         chat.append(user(scoring_prompt))
 
         try:
+            logger.info("SCORING: Sending request to Grok API...")
             # Sample from the chat - Grok will search the collection and analyze
             response = chat.sample()
+            logger.info("SCORING: Response received from Grok API")
 
             logger.info(
                 "SCORING: Response received (%d tokens)",
