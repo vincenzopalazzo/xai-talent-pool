@@ -1,1 +1,1 @@
-DELETE FROM applications WHERE id = ? RETURNING *
+DELETE FROM applications WHERE id = ?

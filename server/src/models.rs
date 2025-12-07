@@ -62,6 +62,17 @@ pub struct ApiError {
     pub code: u16,
 }
 
+#[derive(Deserialize, Apiv2Schema)]
+pub struct BulkDeleteRequest {
+    pub ids: Vec<String>,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct BulkDeleteResponse {
+    pub deleted_count: u64,
+    pub total_requested: usize,
+}
+
 // Job models
 
 #[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]

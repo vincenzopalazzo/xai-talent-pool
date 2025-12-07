@@ -118,6 +118,23 @@ pub async fn delete_talent(pool: &Pool, id: String) -> Result<bool, sqlx::Error>
     Ok(rows > 0)
 }
 
+pub async fn delete_talents_bulk(pool: &Pool, ids: &[String]) -> Result<u64, sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+
+    let placeholders: Vec<String> = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+    let query_str = format!("DELETE FROM talents WHERE id IN ({})", placeholders.join(", "));
+
+    let mut query = sqlx::query(&query_str);
+    for id in ids {
+        query = query.bind(id);
+    }
+
+    let rows = query.execute(pool).await?.rows_affected();
+    Ok(rows)
+}
+
 // Job database functions
 
 pub async fn create_job(pool: &Pool, job: &Job) -> Result<Job, sqlx::Error> {
@@ -239,6 +256,23 @@ pub async fn delete_application(pool: &Pool, id: String) -> Result<bool, sqlx::E
         .await?
         .rows_affected();
     Ok(rows > 0)
+}
+
+pub async fn delete_applications_bulk(pool: &Pool, ids: &[String]) -> Result<u64, sqlx::Error> {
+    if ids.is_empty() {
+        return Ok(0);
+    }
+
+    let placeholders: Vec<String> = ids.iter().enumerate().map(|(i, _)| format!("?{}", i + 1)).collect();
+    let query_str = format!("DELETE FROM applications WHERE id IN ({})", placeholders.join(", "));
+
+    let mut query = sqlx::query(&query_str);
+    for id in ids {
+        query = query.bind(id);
+    }
+
+    let rows = query.execute(pool).await?.rows_affected();
+    Ok(rows)
 }
 
 /// Update talent's resume_document_id

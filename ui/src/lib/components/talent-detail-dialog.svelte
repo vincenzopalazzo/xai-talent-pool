@@ -4,6 +4,8 @@
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Avatar from '$lib/components/ui/avatar';
 	import { Separator } from '$lib/components/ui/separator';
+	import * as AlertDialog from '$lib/components/ui/alert-dialog';
+	import { Checkbox } from '$lib/components/ui/checkbox';
 	import {
 		MapPin,
 		Briefcase,
@@ -18,7 +20,9 @@
 		Github,
 		Linkedin,
 		Twitter,
-		Trash2
+		Trash2,
+		CheckSquare,
+		X
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Talent, Application, Job, ExperienceSummary } from '$lib/types';
@@ -47,6 +51,15 @@
 	let deleteConfirmOpen = $state(false);
 	let applicationToDelete = $state<string | null>(null);
 	let isDeletingApplication = $state(false);
+
+	// Bulk delete state
+	let selectionMode = $state(false);
+	let selectedApplications = $state<Set<string>>(new Set());
+	let bulkDeleteDialogOpen = $state(false);
+	let isBulkDeleting = $state(false);
+
+	const selectedCount = $derived(selectedApplications.size);
+	const allSelected = $derived(applications.length > 0 && selectedApplications.size === applications.length);
 
 	// Fetch applications when dialog opens
 	$effect(() => {
@@ -122,6 +135,60 @@
 			console.error('Error deleting application:', error);
 		} finally {
 			isDeletingApplication = false;
+		}
+	}
+
+	// Bulk delete functions
+	function handleSelectionChange(id: string, checked: boolean | 'indeterminate') {
+		if (typeof checked === 'boolean') {
+			if (checked) {
+				selectedApplications.add(id);
+			} else {
+				selectedApplications.delete(id);
+			}
+			selectedApplications = new Set(selectedApplications);
+		}
+	}
+
+	function toggleSelectAll() {
+		if (allSelected) {
+			selectedApplications = new Set();
+		} else {
+			selectedApplications = new Set(applications.map((app) => app.id));
+		}
+	}
+
+	function exitSelectionMode() {
+		selectionMode = false;
+		selectedApplications = new Set();
+	}
+
+	async function bulkDeleteApplications() {
+		if (selectedApplications.size === 0) return;
+
+		isBulkDeleting = true;
+		try {
+			const response = await fetch('http://localhost:8080/api/v1/applications/bulk-delete', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({ ids: Array.from(selectedApplications) })
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				console.log(`Deleted ${result.deleted_count} of ${result.total_requested} applications`);
+				bulkDeleteDialogOpen = false;
+				exitSelectionMode();
+				await fetchApplications();
+			} else {
+				console.error('Failed to delete applications:', response.statusText);
+			}
+		} catch (err) {
+			console.error('Error deleting applications:', err);
+		} finally {
+			isBulkDeleting = false;
 		}
 	}
 
@@ -314,7 +381,38 @@
 
 			<!-- Applications -->
 			<div class="space-y-3">
-				<h3 class="text-sm font-semibold">Job Applications</h3>
+				<div class="flex items-center justify-between">
+					<h3 class="text-sm font-semibold">Job Applications</h3>
+					{#if applications.length > 0}
+						<div class="flex items-center gap-2">
+							{#if selectionMode}
+								<span class="text-xs text-muted-foreground">
+									{selectedCount} selected
+								</span>
+								<Button variant="ghost" size="sm" onclick={toggleSelectAll}>
+									{allSelected ? 'Deselect All' : 'Select All'}
+								</Button>
+								<Button
+									variant="destructive"
+									size="sm"
+									disabled={selectedCount === 0}
+									onclick={() => (bulkDeleteDialogOpen = true)}
+								>
+									<Trash2 class="mr-1 h-3 w-3" />
+									Delete
+								</Button>
+								<Button variant="outline" size="sm" onclick={exitSelectionMode}>
+									<X class="h-3 w-3" />
+								</Button>
+							{:else}
+								<Button variant="outline" size="sm" onclick={() => (selectionMode = true)}>
+									<CheckSquare class="mr-1 h-3 w-3" />
+									Select
+								</Button>
+							{/if}
+						</div>
+					{/if}
+				</div>
 				{#if isLoadingApplications}
 					<div class="flex items-center justify-center py-4">
 						<Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
@@ -324,47 +422,58 @@
 				{:else}
 					<div class="space-y-3">
 						{#each applications as app (app.id)}
-							<div class="rounded-lg border p-3">
+							<div class="rounded-lg border p-3 {selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}">
 								<div class="flex items-start justify-between gap-3">
-									<div class="flex-1 space-y-1">
-										<div class="flex items-center gap-2">
-											<Building2 class="h-4 w-4 text-muted-foreground" />
-											<span class="font-medium text-sm">
-												{app.job?.title || 'Unknown Position'}
-											</span>
-											<Badge variant={getStatusVariant(app.status)} class="capitalize text-xs">
-												{app.status}
-											</Badge>
-										</div>
-										{#if app.job?.company_name}
-											<p class="text-xs text-muted-foreground">{app.job.company_name}</p>
+									<div class="flex items-start gap-2 flex-1">
+										{#if selectionMode}
+											<Checkbox
+												checked={selectedApplications.has(app.id)}
+												onCheckedChange={(checked) => handleSelectionChange(app.id, checked)}
+												class="mt-0.5 h-4 w-4"
+											/>
 										{/if}
-										<p class="text-xs text-muted-foreground">
-											Applied {formatDate(app.created_at)}
-										</p>
+										<div class="space-y-1">
+											<div class="flex items-center gap-2">
+												<Building2 class="h-4 w-4 text-muted-foreground" />
+												<span class="font-medium text-sm">
+													{app.job?.title || 'Unknown Position'}
+												</span>
+												<Badge variant={getStatusVariant(app.status)} class="capitalize text-xs">
+													{app.status}
+												</Badge>
+											</div>
+											{#if app.job?.company_name}
+												<p class="text-xs text-muted-foreground">{app.job.company_name}</p>
+											{/if}
+											<p class="text-xs text-muted-foreground">
+												Applied {formatDate(app.created_at)}
+											</p>
+										</div>
 									</div>
-									<div class="flex gap-2">
-										{#if app.has_resume}
+									{#if !selectionMode}
+										<div class="flex gap-2">
+											{#if app.has_resume}
+												<Button
+													variant="outline"
+													size="sm"
+													onclick={() => openResumePreview(app.id, app.resume_filename)}
+												>
+													<Eye class="mr-1 h-3 w-3" />
+													View Resume
+												</Button>
+											{/if}
 											<Button
 												variant="outline"
 												size="sm"
-												onclick={() => openResumePreview(app.id, app.resume_filename)}
+												onclick={() => confirmDeleteApplication(app.id)}
 											>
-												<Eye class="mr-1 h-3 w-3" />
-												View Resume
+												<Trash2 class="h-3 w-3" />
 											</Button>
-										{/if}
-										<Button
-											variant="outline"
-											size="sm"
-											onclick={() => confirmDeleteApplication(app.id)}
-										>
-											<Trash2 class="h-3 w-3" />
-										</Button>
-									</div>
+										</div>
+									{/if}
 								</div>
 								{#if app.has_resume && app.resume_filename}
-									<div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+									<div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground {selectionMode ? 'ml-6' : ''}">
 										<FileText class="h-3 w-3" />
 										<span>{app.resume_filename}</span>
 									</div>
@@ -432,3 +541,25 @@
 		</Dialog.Footer>
 	</Dialog.Content>
 </Dialog.Root>
+
+<!-- Bulk Delete Confirmation Dialog -->
+<AlertDialog.Root bind:open={bulkDeleteDialogOpen}>
+	<AlertDialog.Content>
+		<AlertDialog.Header>
+			<AlertDialog.Title>Delete {selectedCount} application{selectedCount !== 1 ? 's' : ''}?</AlertDialog.Title>
+			<AlertDialog.Description>
+				This action cannot be undone. This will permanently delete the selected application{selectedCount !== 1 ? 's' : ''} for {talent.name}.
+			</AlertDialog.Description>
+		</AlertDialog.Header>
+		<AlertDialog.Footer>
+			<AlertDialog.Cancel disabled={isBulkDeleting}>Cancel</AlertDialog.Cancel>
+			<AlertDialog.Action
+				onclick={bulkDeleteApplications}
+				disabled={isBulkDeleting}
+				class="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+			>
+				{isBulkDeleting ? 'Deleting...' : 'Delete'}
+			</AlertDialog.Action>
+		</AlertDialog.Footer>
+	</AlertDialog.Content>
+</AlertDialog.Root>
