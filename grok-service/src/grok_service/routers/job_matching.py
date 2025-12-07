@@ -1,6 +1,8 @@
 """Job matching API router."""
 
+import asyncio
 import logging
+from concurrent.futures import ThreadPoolExecutor
 
 from fastapi import APIRouter
 
@@ -13,6 +15,9 @@ from grok_service.services.job_matching import JobMatchingService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/matching", tags=["matching"])
+
+# Thread pool for running sync code
+_executor = ThreadPoolExecutor(max_workers=4)
 
 
 @router.post("/job", response_model=JobMatchingResponse)
@@ -43,15 +48,23 @@ async def match_candidates_to_job(
 
     try:
         service = JobMatchingService()
-        result = service.match_candidates_to_job(
-            job_id=request.job_id,
-            job_title=request.job_title,
-            job_description=request.job_description,
-            company_name=request.company_name,
-            skills_required=request.skills_required,
-            experience_level=request.experience_level,
-            candidates=request.candidates,
-            top_n=request.top_n,
+
+        # Run synchronous xai_sdk code in a thread pool to not block
+        loop = asyncio.get_event_loop()
+        result = await asyncio.wait_for(
+            loop.run_in_executor(
+                _executor,
+                service.match_candidates_to_job,
+                request.job_id,
+                request.job_title,
+                request.job_description,
+                request.company_name,
+                request.skills_required,
+                request.experience_level,
+                request.candidates,
+                request.top_n,
+            ),
+            timeout=240.0,  # 4 minute timeout
         )
 
         logger.info("=" * 70)
@@ -63,6 +76,14 @@ async def match_candidates_to_job(
             success=True,
             result=result,
             error=None,
+        )
+
+    except asyncio.TimeoutError:
+        logger.error("JOB MATCHING API: Request timed out after 240 seconds")
+        return JobMatchingResponse(
+            success=False,
+            result=None,
+            error="Job matching timed out. The AI search is taking too long.",
         )
 
     except Exception as e:

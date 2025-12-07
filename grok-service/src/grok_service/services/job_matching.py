@@ -139,8 +139,11 @@ Return JSON array (top {top_n} only, sorted by score descending):
 
         try:
             logger.info("JOB MATCHING: Sending request to Grok API...")
+            logger.info("JOB MATCHING: Collection IDs: %s", collection_ids)
+            logger.info("JOB MATCHING: Prompt length: %d chars", len(matching_prompt))
             response = chat.sample()
             logger.info("JOB MATCHING: Response received")
+            logger.info("JOB MATCHING: Response type: %s", type(response))
 
             # Parse response
             content = response.content.strip()

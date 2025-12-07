@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS reorder_events (
     FOREIGN KEY (job_id) REFERENCES jobs(id) ON DELETE CASCADE
 );
 
-CREATE INDEX idx_reorder_events_job_id ON reorder_events(job_id);
-CREATE INDEX idx_reorder_events_timestamp ON reorder_events(event_timestamp);
+CREATE INDEX IF NOT EXISTS idx_reorder_events_job_id ON reorder_events(job_id);
+CREATE INDEX IF NOT EXISTS idx_reorder_events_timestamp ON reorder_events(event_timestamp);
 
 -- Pairwise Preferences Table
 -- Stores derived preferences (winner ≻ loser) from reorder events
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS pairwise_preferences (
     UNIQUE(winner_id, loser_id, job_id, reorder_event_id)
 );
 
-CREATE INDEX idx_pairwise_preferences_job_id ON pairwise_preferences(job_id);
-CREATE INDEX idx_pairwise_preferences_winner ON pairwise_preferences(winner_id);
-CREATE INDEX idx_pairwise_preferences_loser ON pairwise_preferences(loser_id);
-CREATE INDEX idx_pairwise_preferences_source ON pairwise_preferences(source);
+CREATE INDEX IF NOT EXISTS idx_pairwise_preferences_job_id ON pairwise_preferences(job_id);
+CREATE INDEX IF NOT EXISTS idx_pairwise_preferences_winner ON pairwise_preferences(winner_id);
+CREATE INDEX IF NOT EXISTS idx_pairwise_preferences_loser ON pairwise_preferences(loser_id);
+CREATE INDEX IF NOT EXISTS idx_pairwise_preferences_source ON pairwise_preferences(source);
