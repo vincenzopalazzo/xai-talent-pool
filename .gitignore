@@ -29,3 +29,29 @@ Thumbs.db
 # Output directories
 search_results/
 output/
+# Rust build artifacts
+server/target/
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
+
+# IDE/Editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
