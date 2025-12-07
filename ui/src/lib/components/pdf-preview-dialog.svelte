@@ -44,7 +44,7 @@
 </script>
 
 <Dialog.Root bind:open>
-	<Dialog.Content class="max-h-[95vh] max-w-5xl p-0">
+	<Dialog.Content class="h-[95vh] w-[95vw] max-w-[95vw] p-0">
 		<Dialog.Header class="flex flex-row items-center justify-between border-b px-4 py-3">
 			<div>
 				<Dialog.Title class="text-lg">{filename}</Dialog.Title>
@@ -61,7 +61,7 @@
 			</div>
 		</Dialog.Header>
 
-		<div class="relative h-[80vh] w-full bg-muted">
+		<div class="relative flex-1 w-full bg-muted" style="height: calc(95vh - 70px);">
 			{#if isLoading}
 				<div class="absolute inset-0 flex items-center justify-center">
 					<Loader2 class="h-8 w-8 animate-spin text-muted-foreground" />
