@@ -35,6 +35,12 @@ async fn create_talent(
         bio: json.bio.clone(),
         verified: json.verified as i32,
         created_at: Utc::now().to_rfc3339(),
+        // Resume-extracted fields (populated later by Grok service)
+        resume_experiences: None,
+        linkedin_url: None,
+        x_url: None,
+        github_url: None,
+        gitlab_url: None,
     };
     let inserted = crate::database::create_talent(&pool, &new_talent).await
         .map_err(actix_web::error::ErrorInternalServerError)?;

@@ -75,7 +75,7 @@ grok-install: $(GROK_VENV)
 	$(GROK_PYTHON) -m pip install -e "grok-service[dev]"
 
 grok-dev: $(GROK_VENV)
-	cd grok-service && ../.venv/bin/python -m uvicorn grok_service.main:app --reload --host 0.0.0.0 --port 8001
+	cd grok-service && GRPC_DNS_RESOLVER=native .venv/bin/python -m uvicorn grok_service.main:app --reload --host 0.0.0.0 --port 8001
 
 grok-format: $(GROK_VENV)
 	$(GROK_PYTHON) -m black grok-service/src grok-service/tests
@@ -84,7 +84,7 @@ grok-lint: $(GROK_VENV)
 	$(GROK_PYTHON) -m ruff check grok-service/src grok-service/tests
 
 grok-test: $(GROK_VENV)
-	cd grok-service && ../.venv/bin/python -m pytest
+	cd grok-service && GRPC_DNS_RESOLVER=native .venv/bin/python -m pytest
 
 grok-check: $(GROK_VENV)
 	$(GROK_PYTHON) -m black --check grok-service/src grok-service/tests && $(GROK_PYTHON) -m ruff check grok-service/src grok-service/tests

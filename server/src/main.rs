@@ -16,6 +16,10 @@ struct Args {
     /// Database URL
     #[arg(long, env = "DATABASE_URL", default_value = "sqlite://talents.db?mode=rwc")]
     pub database_url: String,
+
+    /// Grok service URL for resume analysis
+    #[arg(long, env = "GROK_SERVICE_URL", default_value = "http://localhost:8001")]
+    pub grok_service_url: String,
 }
 
 #[tokio::main]
@@ -28,7 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("OpenAPI docs: http://{}:{}/", args.host, args.port);
     info!("Swagger UI: http://{}:{}/", args.host, args.port);
 
-    run_server(&args.host, args.port, &args.database_url).await?;
+    run_server(&args.host, args.port, &args.database_url, &args.grok_service_url).await?;
 
     Ok(())
 }

@@ -79,6 +79,22 @@ async def initial_screening(
             "The file may be empty or image-based.",
         )
 
+    # Log extracted PDF text
+    logger.info("=" * 70)
+    logger.info("SCREENING: Received request")
+    logger.info("=" * 70)
+    logger.info("Talent ID: %s", talent.id)
+    logger.info("Talent Name: %s", talent.name)
+    logger.info("PDF Size: %d bytes", len(resume_content))
+    logger.info("Extracted text length: %d characters", len(resume_text))
+    logger.info("=" * 70)
+    logger.info("EXTRACTED PDF TEXT:")
+    logger.info("=" * 70)
+    logger.info(resume_text[:2000] if len(resume_text) > 2000 else resume_text)
+    if len(resume_text) > 2000:
+        logger.info("... (truncated, total %d chars)", len(resume_text))
+    logger.info("=" * 70)
+
     # Analyze resume with Grok
     try:
         grok_service = GrokService()
@@ -115,23 +131,23 @@ async def initial_screening(
         urls=urls,
     )
 
-    # Print result to console
-    print("\n" + "=" * 60)
-    print("SCREENING RESULT")
-    print("=" * 60)
-    print(f"Talent ID: {result.talent_id}")
-    print(f"\nExperiences ({len(result.experiences)}):")
+    # Log result
+    logger.info("=" * 60)
+    logger.info("SCREENING RESULT")
+    logger.info("=" * 60)
+    logger.info("Talent ID: %s", result.talent_id)
+    logger.info("Experiences (%d):", len(result.experiences))
     for i, exp in enumerate(result.experiences, 1):
-        print(f"\n  {i}. {exp.role} at {exp.company}")
+        logger.info("  %d. %s at %s", i, exp.role, exp.company)
         if exp.duration:
-            print(f"     Duration: {exp.duration}")
-        print(f"     Summary: {exp.summary}")
-    print("\nProfile URLs:")
-    print(f"  LinkedIn: {result.urls.linkedin or 'Not found'}")
-    print(f"  X:        {result.urls.x or 'Not found'}")
-    print(f"  GitHub:   {result.urls.github or 'Not found'}")
-    print(f"  GitLab:   {result.urls.gitlab or 'Not found'}")
-    print("=" * 60 + "\n")
+            logger.info("     Duration: %s", exp.duration)
+        logger.info("     Summary: %s", exp.summary)
+    logger.info("Profile URLs:")
+    logger.info("  LinkedIn: %s", result.urls.linkedin or "Not found")
+    logger.info("  X:        %s", result.urls.x or "Not found")
+    logger.info("  GitHub:   %s", result.urls.github or "Not found")
+    logger.info("  GitLab:   %s", result.urls.gitlab or "Not found")
+    logger.info("=" * 60)
 
     return ScreeningResponse(
         success=True,

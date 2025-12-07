@@ -16,12 +16,16 @@ use super::applications::{
 #[derive(Clone)]
 pub struct AppState {
     pub db_pool: sqlx::SqlitePool,
+    pub grok_service_url: String,
 }
 
 impl AppState {
-    pub async fn new(database_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub async fn new(database_url: &str, grok_service_url: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let db_pool = crate::database::init_pool(database_url).await?;
-        Ok(Self { db_pool })
+        Ok(Self {
+            db_pool,
+            grok_service_url: grok_service_url.to_string(),
+        })
     }
 }
 
@@ -65,8 +69,8 @@ pub async fn swagger_ui() -> HttpResponseWrapper {
     )
 }
 
-pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let state = AppState::new(database_url).await?;
+pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str, grok_service_url: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let state = AppState::new(database_url, grok_service_url).await?;
 
     let bind_address = format!("{}:{}", rest_host, rest_port);
     info!("Starting X Talent Pool Server on http://{}", bind_address);

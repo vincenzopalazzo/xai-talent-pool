@@ -1,3 +1,10 @@
+export interface ExperienceSummary {
+	company: string;
+	role: string;
+	duration?: string;
+	summary: string;
+}
+
 export interface Talent {
 	id: string;
 	name: string;
@@ -12,6 +19,12 @@ export interface Talent {
 	verified: boolean;
 	created_at: string;
 	saved?: boolean; // local UI state
+	// Grok-extracted resume fields
+	resume_experiences?: string; // JSON array of ExperienceSummary
+	linkedin_url?: string;
+	x_url?: string;
+	github_url?: string;
+	gitlab_url?: string;
 }
 
 export interface Job {
