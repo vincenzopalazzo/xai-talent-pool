@@ -372,7 +372,7 @@
 
 				<div class="space-y-4">
 					<h4 class="text-sm font-medium leading-none">Application Materials</h4>
-					
+
 					<!-- Resume Upload -->
 					<div class="space-y-2">
 						<Label for="resume-existing">Resume (Optional)</Label>
@@ -401,7 +401,7 @@
 								</button>
 							</div>
 						{:else}
-							<div 
+							<div
 								class="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer"
 								onclick={() => document.getElementById('resume-existing')?.click()}
 								onkeydown={(e) => e.key === 'Enter' && document.getElementById('resume-existing')?.click()}
@@ -509,7 +509,7 @@
 					<!-- Application Materials -->
 					<div class="space-y-4">
 						<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Application Materials</h4>
-						
+
 						<!-- Resume Upload -->
 						<div class="space-y-2">
 							<Label for="resume-new">Resume (Optional)</Label>
@@ -538,7 +538,7 @@
 									</button>
 								</div>
 							{:else}
-								<div 
+								<div
 									class="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer"
 									onclick={() => document.getElementById('resume-new')?.click()}
 									onkeydown={(e) => e.key === 'Enter' && document.getElementById('resume-new')?.click()}

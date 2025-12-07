@@ -47,6 +47,8 @@ async fn create_talent(
         resume_document_id: None,
         social_analysis: None,
         x_handle_discovered: None,
+        candidate_score: None,
+        candidate_score_details: None,
     };
     let inserted = crate::database::create_talent(&pool, &new_talent).await
         .map_err(actix_web::error::ErrorInternalServerError)?;

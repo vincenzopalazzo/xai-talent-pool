@@ -5,7 +5,7 @@ use chrono::Utc;
 use log::{info, error, warn};
 
 use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError, BulkDeleteRequest, BulkDeleteResponse};
-use crate::grok_client::{GrokClient, TalentInfo, SocialMediaAnalysisRequest, SocialMediaInput, ProfileUrls};
+use crate::grok_client::{GrokClient, TalentInfo, SocialMediaAnalysisRequest, SocialMediaInput, ProfileUrls, CandidateScoringRequest, JobInfoForScoring};
 use super::server::AppState;
 
 #[api_v2_operation]
@@ -77,10 +77,15 @@ pub async fn create_application(
             let pool_clone = pool.clone();
             let talent_id = talent.id.clone();
             let talent_name = talent.name.clone();
+            let talent_title = talent.title.clone();
+            let talent_skills = talent.skills.clone();
             let collection_id = talent.collection_id.clone();
             let old_resume_document_id = talent.resume_document_id.clone();
             let pdf_bytes_for_upload = pdf_bytes.clone();
             let filename_for_upload = filename.clone();
+
+            // Clone job info for scoring
+            let job_for_scoring = job.clone().unwrap();
 
             tokio::spawn(async move {
                 info!("======================================================================");
@@ -261,7 +266,7 @@ pub async fn create_application(
                         info!("======================================================================");
                         info!("SOCIAL MEDIA ANALYSIS: Starting");
                         info!("======================================================================");
-                        
+
                         let social_request = SocialMediaAnalysisRequest {
                             talent_id: talent_id.clone(),
                             collection_id: Some(coll_id.clone()),
@@ -276,7 +281,7 @@ pub async fn create_application(
                             },
                             platforms_to_search: vec!["X".to_string(), "GitHub".to_string(), "LinkedIn".to_string()],
                         };
-                        
+
                         match client.analyze_social_media(&social_request).await {
                             Ok(response) => {
                                 if response.success {
@@ -284,10 +289,10 @@ pub async fn create_application(
                                     if let Some(result) = response.result {
                                         // Update talent with social analysis
                                         let analysis_json = serde_json::to_string(&result).ok();
-                                        
+
                                         // We need to extract x_handle if present
                                         let x_handle = result.get("x_handle").and_then(|v| v.as_str()).map(|s| s.to_string());
-                                        
+
                                         match crate::database::update_talent_social_analysis(
                                             &pool_clone,
                                             talent_id.clone(),
@@ -304,6 +309,58 @@ pub async fn create_application(
                             }
                             Err(e) => error!("SOCIAL MEDIA ANALYSIS ERROR: {}", e),
                         }
+                    }
+
+                    // Score candidate against the job using collection data
+                    info!("======================================================================");
+                    info!("CANDIDATE SCORING: Starting");
+                    info!("======================================================================");
+
+                    let scoring_request = CandidateScoringRequest {
+                        talent_id: talent_id.clone(),
+                        collection_id: coll_id.clone(),
+                        job: JobInfoForScoring {
+                            id: job_for_scoring.id.clone(),
+                            title: job_for_scoring.title.clone(),
+                            description: job_for_scoring.description.clone(),
+                            company_name: job_for_scoring.company_name.clone(),
+                            skills_required: job_for_scoring.skills_required.clone(),
+                            experience_level: job_for_scoring.experience_level.clone(),
+                            location: job_for_scoring.location.clone(),
+                            location_type: job_for_scoring.location_type.clone(),
+                        },
+                        candidate_name: talent_name.clone(),
+                        candidate_title: talent_title.clone(),
+                        candidate_skills: talent_skills.clone(),
+                    };
+
+                    match client.score_candidate(&scoring_request).await {
+                        Ok(response) => {
+                            if response.success {
+                                info!("CANDIDATE SCORING: Success!");
+                                if let Some(result) = response.result {
+                                    info!("Score: {}", result.overall_score);
+                                    info!("Recommendation: {}", result.recommendation);
+                                    info!("Summary: {}", result.summary);
+
+                                    // Store the scoring result as JSON in the talent record
+                                    let scoring_json = serde_json::to_string(&result).ok();
+
+                                    match crate::database::update_talent_candidate_score(
+                                        &pool_clone,
+                                        talent_id.clone(),
+                                        result.overall_score,
+                                        scoring_json,
+                                    ).await {
+                                        Ok(_) => info!("SUCCESS: Updated talent {} with candidate score", talent_id),
+                                        Err(e) => error!("FAILED to update talent {} with candidate score: {}", talent_id, e),
+                                    }
+                                }
+                            } else {
+                                error!("CANDIDATE SCORING: Failed - {:?}", response.error);
+                            }
+                        }
+                        Err(e) => error!("CANDIDATE SCORING ERROR: {}", e),
                     }
                 } else {
                     error!("DOCUMENT UPLOAD: Skipped - no collection available");

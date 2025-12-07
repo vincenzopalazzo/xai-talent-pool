@@ -28,6 +28,25 @@ export interface SocialMediaAnalysis {
 	summary?: string;
 }
 
+export interface ScoringBreakdown {
+	skills_match: number;
+	experience_fit: number;
+	culture_fit: number;
+	overall_impression: number;
+}
+
+export interface CandidateScoreDetails {
+	talent_id: string;
+	job_id: string;
+	overall_score: number;
+	breakdown: ScoringBreakdown;
+	strengths: string[];
+	concerns: string[];
+	recommendation: string; // strong_yes, yes, maybe, no
+	summary: string;
+	timestamp: string;
+}
+
 export interface Talent {
 	id: string;
 	name: string;
@@ -54,6 +73,9 @@ export interface Talent {
 	// Social Media Analysis
 	social_analysis?: string; // JSON string of SocialMediaAnalysis
 	x_handle_discovered?: string;
+	// Candidate Scoring
+	candidate_score?: number;
+	candidate_score_details?: string; // JSON string of CandidateScoreDetails
 }
 
 export interface Job {

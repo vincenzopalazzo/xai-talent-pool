@@ -45,8 +45,14 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
         let _ = sqlx::query(statement).execute(&pool).await;
     }
 
+    // Add candidate score fields (ignore error if column already exists)
+    let candidate_score_schema = include_str!("../migrations/008_add_talent_candidate_score.sql");
+    for statement in candidate_score_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
     // Create reorder tracking tables
-    let reorder_schema = include_str!("../migrations/008_create_reorder_tables.sql");
+    let reorder_schema = include_str!("../migrations/009_create_reorder_tables.sql");
     for statement in reorder_schema.split(';').filter(|s| !s.trim().is_empty()) {
         sqlx::query(statement).execute(&pool).await?;
     }
@@ -355,6 +361,28 @@ pub async fn update_talent_social_analysis(
     )
     .bind(social_analysis)
     .bind(x_handle)
+    .bind(id)
+    .fetch_optional(pool)
+    .await
+}
+
+/// Update talent's candidate score
+pub async fn update_talent_candidate_score(
+    pool: &Pool,
+    id: String,
+    score: f64,
+    score_details: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        r#"
+        UPDATE talents
+        SET candidate_score = ?, candidate_score_details = ?
+        WHERE id = ?
+        RETURNING *
+        "#,
+    )
+    .bind(score)
+    .bind(score_details)
     .bind(id)
     .fetch_optional(pool)
     .await

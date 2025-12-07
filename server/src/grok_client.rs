@@ -118,6 +118,61 @@ pub struct SocialMediaAnalysisResponse {
     pub error: Option<String>,
 }
 
+/// Job info for candidate scoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobInfoForScoring {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub company_name: String,
+    pub skills_required: String,
+    pub experience_level: String,
+    pub location: Option<String>,
+    pub location_type: String,
+}
+
+/// Request for candidate scoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CandidateScoringRequest {
+    pub talent_id: String,
+    pub collection_id: String,
+    pub job: JobInfoForScoring,
+    pub candidate_name: String,
+    pub candidate_title: String,
+    pub candidate_skills: String,
+}
+
+/// Scoring breakdown by category
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScoringBreakdown {
+    pub skills_match: f64,
+    pub experience_fit: f64,
+    pub culture_fit: f64,
+    pub overall_impression: f64,
+}
+
+/// Candidate scoring result
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CandidateScoringResult {
+    pub talent_id: String,
+    pub job_id: String,
+    pub overall_score: f64,
+    pub breakdown: ScoringBreakdown,
+    pub strengths: Vec<String>,
+    pub concerns: Vec<String>,
+    pub recommendation: String,
+    pub summary: String,
+    pub timestamp: String,
+}
+
+/// Response for candidate scoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CandidateScoringResponse {
+    pub success: bool,
+    pub result: Option<CandidateScoringResult>,
+    pub error: Option<String>,
+}
+
 /// Grok service client
 pub struct GrokClient {
     base_url: String,
@@ -380,6 +435,56 @@ impl GrokClient {
             })?;
 
         info!("[GrokClient] Social media analysis - success: {}", parsed.success);
+
+        Ok(parsed)
+    }
+
+    /// Score a candidate for a job using their collection documents
+    pub async fn score_candidate(
+        &self,
+        request: &CandidateScoringRequest,
+    ) -> Result<CandidateScoringResponse, String> {
+        info!("[GrokClient] Scoring candidate {} for job {}", request.talent_id, request.job.id);
+
+        let url = format!("{}/api/v1/scoring/candidate", self.base_url);
+        info!("[GrokClient] Sending POST to: {}", url);
+
+        let response = self
+            .client
+            .post(&url)
+            .json(request)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[GrokClient] Candidate scoring request failed: {}", e);
+                format!("Failed to send request to Grok service: {}", e)
+            })?;
+
+        let status = response.status();
+        info!("[GrokClient] Candidate scoring response status: {}", status);
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            error!("[GrokClient] Candidate scoring error response: {}", body);
+            return Err(format!(
+                "Grok service returned error {}: {}",
+                status, body
+            ));
+        }
+
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        let parsed: CandidateScoringResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                error!("[GrokClient] Candidate scoring JSON parse error: {}", e);
+                format!("Failed to parse response: {}", e)
+            })?;
+
+        info!("[GrokClient] Candidate scoring - success: {}", parsed.success);
+        if let Some(ref result) = parsed.result {
+            info!("[GrokClient] Score: {}, Recommendation: {}", result.overall_score, result.recommendation);
+        }
 
         Ok(parsed)
     }

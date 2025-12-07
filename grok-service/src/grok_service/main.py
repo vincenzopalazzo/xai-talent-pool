@@ -7,6 +7,7 @@ from grok_service import __version__
 from grok_service.routers import (
     collections_router,
     ranking_router,
+    scoring_router,
     screening_router,
     social_media_router,
 )
@@ -26,6 +27,7 @@ app = FastAPI(
 # Include routers
 app.include_router(collections_router)
 app.include_router(ranking_router)
+app.include_router(scoring_router)
 app.include_router(screening_router)
 app.include_router(social_media_router)
 

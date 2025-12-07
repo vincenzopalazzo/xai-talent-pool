@@ -176,5 +176,79 @@ class SocialMediaAnalysisResponse(BaseModel):
     """Response for social media analysis."""
 
     success: bool = Field(..., description="Whether the analysis was successful")
-    result: SocialMediaAnalysisResult | None = Field(None, description="Analysis result")
+    result: SocialMediaAnalysisResult | None = Field(
+        None, description="Analysis result"
+    )
+    error: str | None = Field(None, description="Error message if failed")
+
+
+# Candidate Scoring models
+
+
+class JobInfo(BaseModel):
+    """Job information for candidate scoring."""
+
+    id: str = Field(..., description="Job ID")
+    title: str = Field(..., description="Job title")
+    description: str = Field(..., description="Job description")
+    company_name: str = Field(..., description="Company name")
+    skills_required: str = Field("", description="Comma-separated required skills")
+    experience_level: str = Field("", description="Required experience level")
+    location: str | None = Field(None, description="Job location")
+    location_type: str = Field(
+        "remote", description="Location type (remote, onsite, hybrid)"
+    )
+
+
+class CandidateScoringRequest(BaseModel):
+    """Request for candidate scoring using collection data."""
+
+    talent_id: str = Field(..., description="Talent ID to score")
+    collection_id: str = Field(
+        ..., description="Collection ID containing candidate documents"
+    )
+    job: JobInfo = Field(..., description="Job to score candidate against")
+    candidate_name: str = Field(..., description="Candidate name for context")
+    candidate_title: str = Field("", description="Candidate's current title")
+    candidate_skills: str = Field("", description="Comma-separated candidate skills")
+
+
+class ScoringBreakdown(BaseModel):
+    """Breakdown of scoring factors."""
+
+    skills_match: float = Field(0.0, description="Skills match score (0-100)")
+    experience_fit: float = Field(0.0, description="Experience fit score (0-100)")
+    culture_fit: float = Field(0.0, description="Culture fit score (0-100)")
+    overall_impression: float = Field(
+        0.0, description="Overall impression score (0-100)"
+    )
+
+
+class CandidateScoringResult(BaseModel):
+    """Result of candidate scoring."""
+
+    talent_id: str = Field(..., description="Talent ID")
+    job_id: str = Field(..., description="Job ID")
+    overall_score: float = Field(..., description="Overall fit score (0-100)")
+    breakdown: ScoringBreakdown = Field(
+        default_factory=ScoringBreakdown, description="Score breakdown by category"
+    )
+    strengths: list[str] = Field(
+        default_factory=list, description="Key strengths for this role"
+    )
+    concerns: list[str] = Field(
+        default_factory=list, description="Potential concerns or gaps"
+    )
+    recommendation: str = Field(
+        "", description="Hiring recommendation (strong_yes, yes, maybe, no)"
+    )
+    summary: str = Field("", description="Brief summary of the candidate's fit")
+    timestamp: str = Field(..., description="Scoring timestamp (ISO 8601)")
+
+
+class CandidateScoringResponse(BaseModel):
+    """Response for candidate scoring."""
+
+    success: bool = Field(..., description="Whether scoring was successful")
+    result: CandidateScoringResult | None = Field(None, description="Scoring result")
     error: str | None = Field(None, description="Error message if failed")
