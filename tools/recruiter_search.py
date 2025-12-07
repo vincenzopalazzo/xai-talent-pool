@@ -22,24 +22,71 @@ def search_platform(client, person_name, platform_name, platform_focus):
         model="grok-3-mini",
         reasoning_effort="high",
         messages=[
-            system("You are a professional recruiter's research assistant. Provide detailed, factual information about individuals on social media platforms that would be relevant for job recruiting purposes."),
-        ],
+            system(
+    "You are an evidence-first recruiter research assistant. "
+    "Only provide verifiable facts from publicly available information. "
+    "Do NOT guess, infer private details, or fill gaps with assumptions. "
+    "If something cannot be confirmed, write 'Unknown' or 'Not publicly indicated'. "
+    "Be concise and professional. Use bullet points. "
+    "When referring to a claim that would normally require a source, include a URL if you have one. "
+    "Do not add motivational language, filler, or generic advice unless explicitly asked."
+) ],
     )
 
-    prompt = f"""Search for information about {person_name} on {platform_name}.
+    prompt = f"""
+You are generating a {platform_name}-specific recruiting research note for: {person_name}.
 
-Focus on {platform_focus}.
+Rules:
+- Output MUST be factual and concise.
+- Do NOT speculate.
+- Do NOT include generic coaching or platform tips unless the template explicitly asks for it.
+- If you cannot verify something from public info, write: Unknown.
+- Prefer short bullet points over paragraphs.
+- Do not repeat the instructions.
+- Do not use marketing language.
 
-Provide a comprehensive report including:
-1. Profile information (if publicly available)
-2. Professional background and experience
-3. Skills and expertise demonstrated
-4. Notable projects, contributions, or content
-5. Professional network and connections (if visible)
-6. Any other relevant information for a job recruiter
+Focus scope for {platform_name}:
+{platform_focus}
 
-If you cannot find specific information, provide guidance on what a recruiter should look for on {platform_name}."""
+Write the report in Markdown using this exact structure:
 
+## Identity Match
+- Primary likely profile(s): 
+  - Name:
+  - Handle/URL:
+  - Location (if explicitly listed):
+  - Current role (if explicitly listed):
+- Disambiguation notes (only if needed):
+  - 
+
+## Evidence-Based Highlights
+- 
+
+## Professional Experience (publicly stated)
+- 
+
+## Skills & Technical/Domain Signals
+- 
+
+## Notable Work / Content / Contributions
+- 
+
+## Signals of Seniority / Impact
+- 
+
+## Red Flags (public, professional)
+- Only include if clearly evidenced in public professional context.
+- Otherwise write: Unknown.
+
+## Recruiter Takeaways (factual synthesis)
+- 3–6 bullets that summarize only what is supported above.
+
+## Open Questions
+- 3–6 bullets phrased as questions for a human recruiter to verify.
+
+If no reliable public information is found for {platform_name}, output:
+- "Unknown" under each section and keep the headings.
+"""
     chat.append(user(prompt))
     response = chat.sample()
 
