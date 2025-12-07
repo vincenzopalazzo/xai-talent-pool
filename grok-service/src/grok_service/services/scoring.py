@@ -76,25 +76,27 @@ class CandidateScoringService:
         logger.info("Candidate: %s (%s)", candidate_name, candidate_title)
         logger.info("=" * 70)
 
-        # Create chat with collections_search tool
+        # Validate collection_id
+        if not collection_id:
+            logger.error("SCORING: No collection_id provided!")
+            raise ValueError("collection_id is required for scoring")
+
+        logger.info("SCORING: Querying ONLY collection: %s", collection_id)
+
+        # Create chat with collections_search tool for THIS candidate's collection only
         # max_turns limits the agentic loop to prevent infinite tool calls
         chat = self.client.chat.create(
             model="grok-4-1-fast",
             tools=[
                 collections_search(
-                    collection_ids=[collection_id],
-                    limit=10,
-                    instructions=(
-                        "Search for information about the candidate's skills, experience, "
-                        "projects, education, and any analysis results. Look for evidence "
-                        "of technical abilities, leadership, communication skills, and "
-                        "relevant domain expertise."
-                    ),
+                    collection_ids=[collection_id],  # Single collection for this candidate
+                    limit=5,  # Reduced limit for faster response
+                    instructions="Search this candidate's resume and profile documents.",
                     retrieval_mode="hybrid",
                 ),
             ],
             messages=[system(SCORING_SYSTEM_PROMPT)],
-            max_turns=3,  # Limit tool call iterations
+            max_turns=2,  # Reduced turns: 1 for search, 1 for response
         )
 
         # Build the scoring prompt
