@@ -100,10 +100,10 @@
 					<Star class="h-4 w-4 {isSaved ? 'fill-yellow-400 text-yellow-400' : ''}" />
 				</Button>
 				<DropdownMenu.Root>
-					<DropdownMenu.Trigger>
-						<Button variant="ghost" size="icon" class="h-8 w-8">
-							<MoreHorizontal class="h-4 w-4" />
-						</Button>
+					<DropdownMenu.Trigger
+						class="inline-flex h-8 w-8 items-center justify-center rounded-md text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+					>
+						<MoreHorizontal class="h-4 w-4" />
 					</DropdownMenu.Trigger>
 					<DropdownMenu.Content align="end">
 						<DropdownMenu.Item onclick={() => (detailsDialogOpen = true)}>
