@@ -167,41 +167,6 @@ pub struct ApplicationResponse {
     pub created_at: String,
 }
 
-// RLHF Feedback models
-
-#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
-pub struct Feedback {
-    pub id: String,
-    pub talent_id: String,
-    pub job_id: String,
-    pub recruiter_id: Option<String>,
-    pub feedback_type: String,  // "upvote" or "downvote"
-    pub expected_rank: Option<f64>,  // Where algorithm ranked them (0.0-1.0)
-    pub actual_performance: String,  // better_than_expected, worse_than_expected, as_expected
-    pub notes: Option<String>,
-    pub created_at: String,
-}
-
-#[derive(Deserialize, Apiv2Schema)]
-pub struct CreateFeedbackRequest {
-    pub talent_id: String,
-    pub job_id: String,
-    pub recruiter_id: Option<String>,
-    pub feedback_type: String,  // "upvote" or "downvote"
-    pub expected_rank: Option<f64>,
-    pub notes: Option<String>,
-}
-
-#[derive(Serialize, Apiv2Schema)]
-pub struct FeedbackStats {
-    pub talent_id: String,
-    pub job_id: Option<String>,
-    pub upvotes: i32,
-    pub downvotes: i32,
-    pub net_score: i32,
-    pub total_feedback: i32,
-}
-
 // GRPO Ranking models
 
 #[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
@@ -230,7 +195,6 @@ pub struct MatchFactors {
 pub struct RankedCandidate {
     pub talent: Talent,
     pub ranking: CandidateRanking,
-    pub feedback_stats: Option<FeedbackStats>,
 }
 
 #[derive(Deserialize, Apiv2Schema)]
@@ -238,4 +202,47 @@ pub struct RankCandidatesRequest {
     pub job_id: String,
     pub talent_ids: Option<Vec<String>>,  // If None, rank all candidates
     pub use_feedback: bool,  // Whether to incorporate RLHF feedback
+}
+
+// Manual Reordering models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]
+pub struct ReorderEvent {
+    pub id: String,
+    pub job_id: String,
+    pub before_order: String,  // JSON array of talent IDs
+    pub after_order: String,   // JSON array of talent IDs
+    pub moved_talent_id: Option<String>,
+    pub event_timestamp: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct CreateReorderEventRequest {
+    pub job_id: String,
+    pub before_order: Vec<String>,  // Array of talent IDs
+    pub after_order: Vec<String>,   // Array of talent IDs
+    pub moved_talent_id: Option<String>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]
+pub struct PairwisePreference {
+    pub id: String,
+    pub winner_id: String,
+    pub loser_id: String,
+    pub job_id: String,
+    pub job_text: String,
+    pub winner_text: String,
+    pub loser_text: String,
+    pub source: String,
+    pub confidence: f64,
+    pub reorder_event_id: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct ReorderResponse {
+    pub event_id: String,
+    pub preferences_created: i32,
+    pub message: String,
 }

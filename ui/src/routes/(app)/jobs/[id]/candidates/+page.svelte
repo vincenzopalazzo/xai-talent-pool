@@ -5,11 +5,9 @@
 	import { Button } from '$lib/components/ui/button';
 	import { Badge } from '$lib/components/ui/badge';
 	import * as Card from '$lib/components/ui/card';
-	import { RefreshCw, TrendingUp } from 'lucide-svelte';
+	import { RefreshCw } from 'lucide-svelte';
 	import {
 		rankCandidatesForJob,
-		getFeedbackForJob,
-		updateRankingWeights,
 		type RankedCandidate
 	} from '$lib/services/ranking';
 	import type { Talent } from '$lib/types';
@@ -21,9 +19,7 @@
 	let rankedCandidates = $state<RankedCandidate[]>([]);
 	let isLoading = $state(true);
 	let isReranking = $state(false);
-	let useFeedback = $state(true);
 	let job = $state<any>(null);
-	let modelWeights = $state<Record<string, number> | null>(null);
 
 	/**
 	 * Load and rank candidates for the job
@@ -42,52 +38,19 @@
 		const candidatesResponse = await fetch(`/api/v1/talents`);
 		const allCandidates: Talent[] = await candidatesResponse.json();
 
-		// Fetch existing feedback for this job
-		let feedbackData = undefined;
-		if (useFeedback) {
-			feedbackData = await getFeedbackForJob(jobId);
-		}
-
 		// Rank candidates using GRPO algorithm
-		rankedCandidates = await rankCandidatesForJob(
-			jobId,
-			allCandidates,
-			job,
-			useFeedback,
-			feedbackData
-		);
+		rankedCandidates = await rankCandidatesForJob(jobId, allCandidates, job);
 
 		isLoading = false;
 	}
 
 	/**
-	 * Rerank candidates (useful after feedback is submitted)
+	 * Rerank candidates
 	 */
 	async function rerank() {
 		isReranking = true;
 		await loadAndRankCandidates();
 		isReranking = false;
-	}
-
-	/**
-	 * Retrain the model with latest feedback
-	 */
-	async function retrainModel() {
-		if (!jobId) return;
-
-		const feedbackData = await getFeedbackForJob(jobId);
-
-		if (feedbackData.length === 0) {
-			alert('No feedback available to train on');
-			return;
-		}
-
-		const result = await updateRankingWeights(feedbackData);
-		modelWeights = result.current_weights;
-		alert(`Model retrained! ${result.message}`);
-
-		// Re-rank with updated weights
-		await rerank();
 	}
 
 	// Load candidates on mount
@@ -106,39 +69,12 @@
 				{/if}
 			</div>
 			<div class="flex items-center gap-2">
-				<Button variant="outline" size="sm" onclick={() => {
-					useFeedback = !useFeedback;
-					rerank();
-				}}>
-					{useFeedback ? 'Disable' : 'Enable'} Feedback
-				</Button>
 				<Button variant="outline" size="sm" onclick={rerank} disabled={isReranking}>
 					<RefreshCw class="h-4 w-4 mr-2 {isReranking ? 'animate-spin' : ''}" />
 					Re-rank
 				</Button>
-				<Button variant="default" size="sm" onclick={retrainModel}>
-					<TrendingUp class="h-4 w-4 mr-2" />
-					Retrain Model
-				</Button>
 			</div>
 		</div>
-
-		{#if modelWeights}
-			<Card.Root class="mt-4">
-				<Card.Header>
-					<Card.Title class="text-base">Model Weights (GRPO)</Card.Title>
-				</Card.Header>
-				<Card.Content>
-					<div class="flex flex-wrap gap-2">
-						{#each Object.entries(modelWeights) as [key, value]}
-							<Badge variant="secondary">
-								{key.replace('_', ' ')}: {value.toFixed(3)}
-							</Badge>
-						{/each}
-					</div>
-				</Card.Content>
-			</Card.Root>
-		{/if}
 	</div>
 
 	{#if isLoading}
@@ -179,12 +115,7 @@
 							</Badge>
 						</div>
 					{/if}
-					<TalentCard
-						talent={candidate}
-						jobId={jobId ?? ''}
-						rankPosition={rank_position}
-						showFeedback={true}
-					/>
+					<TalentCard talent={candidate} />
 					<div class="mt-2 text-xs text-muted-foreground">
 						<div class="flex justify-between">
 							<span>Skills: {(match_factors.skills_match * 100).toFixed(0)}%</span>

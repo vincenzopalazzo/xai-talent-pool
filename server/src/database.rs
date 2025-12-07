@@ -1,5 +1,5 @@
 use sqlx::SqlitePool;
-use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application};
+use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application, ReorderEvent, PairwisePreference};
 
 pub type Pool = SqlitePool;
 
@@ -37,6 +37,12 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
     let resume_doc_schema = include_str!("../migrations/006_add_talent_resume_document_id.sql");
     for statement in resume_doc_schema.split(';').filter(|s| !s.trim().is_empty()) {
         let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
+    // Create reorder tracking tables
+    let reorder_schema = include_str!("../migrations/008_create_reorder_tables.sql");
+    for statement in reorder_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        sqlx::query(statement).execute(&pool).await?;
     }
 
     Ok(pool)
@@ -323,5 +329,71 @@ pub async fn update_talent_resume_fields(
         .bind(&gitlab_url)
         .bind(&talent_id)
         .fetch_optional(pool)
+        .await
+}
+
+// Reorder tracking functions
+
+/// Create a reorder event
+pub async fn create_reorder_event(pool: &Pool, event: &ReorderEvent) -> Result<ReorderEvent, sqlx::Error> {
+    sqlx::query_as::<_, ReorderEvent>(
+        "INSERT INTO reorder_events (id, job_id, before_order, after_order, moved_talent_id, event_timestamp, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?)
+         RETURNING *"
+    )
+        .bind(&event.id)
+        .bind(&event.job_id)
+        .bind(&event.before_order)
+        .bind(&event.after_order)
+        .bind(&event.moved_talent_id)
+        .bind(&event.event_timestamp)
+        .bind(&event.created_at)
+        .fetch_one(pool)
+        .await
+}
+
+/// Create a pairwise preference (with UNIQUE constraint for idempotency)
+pub async fn create_pairwise_preference(pool: &Pool, pref: &PairwisePreference) -> Result<Option<PairwisePreference>, sqlx::Error> {
+    // Use INSERT OR IGNORE to handle duplicates gracefully
+    let result = sqlx::query_as::<_, PairwisePreference>(
+        "INSERT OR IGNORE INTO pairwise_preferences
+         (id, winner_id, loser_id, job_id, job_text, winner_text, loser_text, source, confidence, reorder_event_id, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+         RETURNING *"
+    )
+        .bind(&pref.id)
+        .bind(&pref.winner_id)
+        .bind(&pref.loser_id)
+        .bind(&pref.job_id)
+        .bind(&pref.job_text)
+        .bind(&pref.winner_text)
+        .bind(&pref.loser_text)
+        .bind(&pref.source)
+        .bind(pref.confidence)
+        .bind(&pref.reorder_event_id)
+        .bind(&pref.created_at)
+        .fetch_optional(pool)
+        .await;
+
+    result
+}
+
+/// Get all pairwise preferences for a job
+pub async fn get_pairwise_preferences_for_job(pool: &Pool, job_id: String) -> Result<Vec<PairwisePreference>, sqlx::Error> {
+    sqlx::query_as::<_, PairwisePreference>(
+        "SELECT * FROM pairwise_preferences WHERE job_id = ? ORDER BY created_at DESC"
+    )
+        .bind(&job_id)
+        .fetch_all(pool)
+        .await
+}
+
+/// Get all reorder events for a job
+pub async fn get_reorder_events_for_job(pool: &Pool, job_id: String) -> Result<Vec<ReorderEvent>, sqlx::Error> {
+    sqlx::query_as::<_, ReorderEvent>(
+        "SELECT * FROM reorder_events WHERE job_id = ? ORDER BY event_timestamp DESC"
+    )
+        .bind(&job_id)
+        .fetch_all(pool)
         .await
 }
