@@ -17,7 +17,8 @@
 		Building2,
 		Github,
 		Linkedin,
-		Twitter
+		Twitter,
+		Trash2
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Talent, Application, Job, ExperienceSummary } from '$lib/types';
@@ -41,6 +42,11 @@
 	let previewDialogOpen = $state(false);
 	let previewApplicationId = $state<string>('');
 	let previewFilename = $state<string>('Resume');
+
+	// Delete confirmation state
+	let deleteConfirmOpen = $state(false);
+	let applicationToDelete = $state<string | null>(null);
+	let isDeletingApplication = $state(false);
 
 	// Fetch applications when dialog opens
 	$effect(() => {
@@ -85,6 +91,38 @@
 		previewApplicationId = applicationId;
 		previewFilename = filename || 'Resume';
 		previewDialogOpen = true;
+	}
+
+	function confirmDeleteApplication(applicationId: string) {
+		applicationToDelete = applicationId;
+		deleteConfirmOpen = true;
+	}
+
+	async function deleteApplication() {
+		if (!applicationToDelete) return;
+
+		isDeletingApplication = true;
+		try {
+			const response = await fetch(
+				`http://localhost:8080/api/v1/applications/${applicationToDelete}`,
+				{
+					method: 'DELETE'
+				}
+			);
+
+			if (response.ok || response.status === 204) {
+				// Remove the deleted application from the list
+				applications = applications.filter((app) => app.id !== applicationToDelete);
+				deleteConfirmOpen = false;
+				applicationToDelete = null;
+			} else {
+				console.error('Failed to delete application:', response.statusText);
+			}
+		} catch (error) {
+			console.error('Error deleting application:', error);
+		} finally {
+			isDeletingApplication = false;
+		}
 	}
 
 	// Parse skills from comma-separated string or array
@@ -305,16 +343,25 @@
 											Applied {formatDate(app.created_at)}
 										</p>
 									</div>
-									{#if app.has_resume}
+									<div class="flex gap-2">
+										{#if app.has_resume}
+											<Button
+												variant="outline"
+												size="sm"
+												onclick={() => openResumePreview(app.id, app.resume_filename)}
+											>
+												<Eye class="mr-1 h-3 w-3" />
+												View Resume
+											</Button>
+										{/if}
 										<Button
 											variant="outline"
 											size="sm"
-											onclick={() => openResumePreview(app.id, app.resume_filename)}
+											onclick={() => confirmDeleteApplication(app.id)}
 										>
-											<Eye class="mr-1 h-3 w-3" />
-											View Resume
+											<Trash2 class="h-3 w-3" />
 										</Button>
-									{/if}
+									</div>
 								</div>
 								{#if app.has_resume && app.resume_filename}
 									<div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
@@ -346,3 +393,42 @@
 	filename={previewFilename}
 	bind:open={previewDialogOpen}
 />
+
+<!-- Delete Confirmation Dialog -->
+<Dialog.Root bind:open={deleteConfirmOpen}>
+	<Dialog.Content class="sm:max-w-md">
+		<Dialog.Header>
+			<Dialog.Title>Delete Application</Dialog.Title>
+			<Dialog.Description>
+				Are you sure you want to delete this application? This action cannot be undone.
+			</Dialog.Description>
+		</Dialog.Header>
+		<Dialog.Footer class="flex-col gap-2 sm:flex-row">
+			<Button
+				variant="outline"
+				class="w-full sm:w-auto"
+				onclick={() => {
+					deleteConfirmOpen = false;
+					applicationToDelete = null;
+				}}
+				disabled={isDeletingApplication}
+			>
+				Cancel
+			</Button>
+			<Button
+				variant="destructive"
+				class="w-full sm:flex-1"
+				onclick={deleteApplication}
+				disabled={isDeletingApplication}
+			>
+				{#if isDeletingApplication}
+					<Loader2 class="mr-2 h-4 w-4 animate-spin" />
+					Deleting...
+				{:else}
+					<Trash2 class="mr-2 h-4 w-4" />
+					Delete Application
+				{/if}
+			</Button>
+		</Dialog.Footer>
+	</Dialog.Content>
+</Dialog.Root>

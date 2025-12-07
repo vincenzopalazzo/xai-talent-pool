@@ -408,3 +408,33 @@ pub async fn get_application_resume(
         Err(e) => Err(actix_web::error::ErrorInternalServerError(e)),
     }
 }
+
+#[api_v2_operation]
+#[paperclip::actix::delete("/api/v1/applications/{id}", summary = "Delete an application")]
+pub async fn delete_application(
+    data: web::Data<AppState>,
+    path: web::Path<String>,
+) -> ActixResult<HttpResponse> {
+    let id = path.into_inner();
+    let pool = &data.db_pool;
+
+    info!("Deleting application with id: {}", id);
+
+    match crate::database::delete_application(pool, id.clone()).await {
+        Ok(true) => {
+            info!("Successfully deleted application: {}", id);
+            Ok(HttpResponse::NoContent().finish())
+        }
+        Ok(false) => {
+            warn!("Application not found for deletion: {}", id);
+            Ok(HttpResponse::NotFound().json(ApiError {
+                message: "Application not found".to_string(),
+                code: 404,
+            }))
+        }
+        Err(e) => {
+            error!("Failed to delete application {}: {}", id, e);
+            Err(actix_web::error::ErrorInternalServerError(e))
+        }
+    }
+}
