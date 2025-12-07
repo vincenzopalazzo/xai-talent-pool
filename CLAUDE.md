@@ -4,7 +4,7 @@ This file provides guidance to Claude Code when working on this project.
 
 ## Project Overview
 
-This is a talent pool application for X, built as a monorepo with a Svelte frontend and Rust backend using actix-web and paperclip for OpenAPI documentation.
+This is a talent pool application for X, built as a monorepo with a Svelte frontend, Rust backend using actix-web, and a Python Grok microservice for AI operations.
 
 ## Project Structure
 
@@ -13,20 +13,29 @@ xai-talent-pool/
 ├── Makefile          # Build commands for the monorepo
 ├── CLAUDE.md         # This file
 ├── server/           # Rust backend API server
+├── grok-service/     # Python Grok microservice
 └── ui/               # Svelte frontend application
 ```
 
 ## Development Commands
 
 ```bash
-make install   # Install dependencies for UI and build server
-make dev         # Run both UI and server development servers concurrently (debug mode)
-make server-dev # Run backend server only (debug mode)
-make build     # Build UI for production
-make server-build # Build backend
-make check     # Type checking for UI
-make server-check # Check backend
-make dev-all        # Run both UI dev and server dev concurrently
+make install       # Install dependencies for UI and build server
+make dev           # Run both UI and server development servers concurrently (debug mode)
+make server-dev    # Run backend server only (debug mode)
+make build         # Build UI for production
+make server-build  # Build backend
+make check         # Type checking for UI
+make server-check  # Check backend
+make dev-all       # Run both UI dev and server dev concurrently
+
+# Grok service commands
+make grok-install  # Install grok-service with dev dependencies
+make grok-dev      # Run grok service in development mode (port 8001)
+make grok-format   # Format Python code with black
+make grok-lint     # Lint Python code with ruff
+make grok-test     # Run pytest tests
+make grok-check    # Run black and ruff checks
 ```
 
 ## UI Development Rules
@@ -104,10 +113,45 @@ make dev-all        # Run both UI dev and server dev concurrently
 - AppState with Arc<Mutex<AppState>> shared via web::Data
 - Clone Arcs for fields like repositories
 
+## Grok Service Development Rules
+
+### Framework
+- Use FastAPI for the HTTP server
+- Use xai-sdk for Grok API integration
+- OpenAPI docs at `/docs` (Swagger UI) and `/redoc`
+
+### Code Quality
+- Use black for code formatting (line length: 88)
+- Use ruff for linting
+- Use pytest for testing
+
+### Project Structure
+```
+grok-service/
+├── pyproject.toml           # Project configuration and dependencies
+├── src/grok_service/        # Main package
+│   ├── __init__.py
+│   ├── main.py              # FastAPI application
+│   └── config.py            # Settings configuration
+└── tests/                   # Test files
+```
+
+### Configuration
+- Environment variables prefixed with `GROK_`
+- `GROK_XAI_API_KEY`: xAI API key for Grok
+- `GROK_HOST`: Server host (default: 0.0.0.0)
+- `GROK_PORT`: Server port (default: 8001)
+
+### API Design
+- RESTful endpoints under `/api/v1/`
+- Health check at `/health`
+- Use Pydantic models for request/response schemas
+
 ## File Naming Conventions
 
 - Components: `kebab-case.svelte` (e.g., `talent-card.svelte`)
 - TypeScript modules: `kebab-case.ts`
 - Rust modules: snake_case.rs
+- Python modules: snake_case.py
 - Routes follow SvelteKit conventions (`+page.svelte`, `+layout.svelte`)
 - Backend routes: /api/v1/resources/{id}
