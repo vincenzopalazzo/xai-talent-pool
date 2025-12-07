@@ -79,7 +79,7 @@ Write the report in Markdown using this exact structure:
 - Otherwise write: Unknown.
 
 ## Recruiter Takeaways (factual synthesis)
-- 3–6 bullets that summarize only what is supported above.
+- 3–w6 bullets that summarize only what is supported above.
 
 ## Open Questions
 - 3–6 bullets phrased as questions for a human recruiter to verify.

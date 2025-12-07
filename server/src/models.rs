@@ -155,3 +155,76 @@ pub struct ApplicationResponse {
     pub status: String,
     pub created_at: String,
 }
+
+// RLHF Feedback models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
+pub struct Feedback {
+    pub id: String,
+    pub talent_id: String,
+    pub job_id: String,
+    pub recruiter_id: Option<String>,
+    pub feedback_type: String,  // "upvote" or "downvote"
+    pub expected_rank: Option<f64>,  // Where algorithm ranked them (0.0-1.0)
+    pub actual_performance: String,  // better_than_expected, worse_than_expected, as_expected
+    pub notes: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct CreateFeedbackRequest {
+    pub talent_id: String,
+    pub job_id: String,
+    pub recruiter_id: Option<String>,
+    pub feedback_type: String,  // "upvote" or "downvote"
+    pub expected_rank: Option<f64>,
+    pub notes: Option<String>,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct FeedbackStats {
+    pub talent_id: String,
+    pub job_id: Option<String>,
+    pub upvotes: i32,
+    pub downvotes: i32,
+    pub net_score: i32,
+    pub total_feedback: i32,
+}
+
+// GRPO Ranking models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug)]
+pub struct CandidateRanking {
+    pub id: String,
+    pub talent_id: String,
+    pub job_id: String,
+    pub rank_score: f64,  // 0.0 to 1.0
+    pub rank_position: i32,  // 1, 2, 3...
+    pub confidence: Option<f64>,
+    pub match_factors: String,  // JSON object with breakdown
+    pub model_version: String,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Deserialize, Apiv2Schema)]
+pub struct MatchFactors {
+    pub skills_match: f64,
+    pub experience_match: f64,
+    pub location_match: f64,
+    pub title_match: f64,
+    pub overall_fit: f64,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct RankedCandidate {
+    pub talent: Talent,
+    pub ranking: CandidateRanking,
+    pub feedback_stats: Option<FeedbackStats>,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct RankCandidatesRequest {
+    pub job_id: String,
+    pub talent_ids: Option<Vec<String>>,  // If None, rank all candidates
+    pub use_feedback: bool,  // Whether to incorporate RLHF feedback
+}

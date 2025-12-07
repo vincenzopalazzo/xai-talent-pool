@@ -6,9 +6,17 @@
 	import * as Avatar from '$lib/components/ui/avatar';
 	import * as DropdownMenu from '$lib/components/ui/dropdown-menu';
 	import TalentDetailDialog from './talent-detail-dialog.svelte';
+	import CandidateFeedback from './candidate-feedback.svelte';
 	import type { Talent } from '$lib/types';
 
-	let { talent }: { talent: Talent } = $props();
+	interface Props {
+		talent: Talent;
+		jobId?: string;
+		rankPosition?: number;
+		showFeedback?: boolean;
+	}
+
+	let { talent, jobId, rankPosition, showFeedback = false }: Props = $props();
 	let isSaved = $state<boolean | null>(null);
 	let detailDialogOpen = $state(false);
 
@@ -98,11 +106,31 @@
 			</span>
 		</div>
 	</Card.Content>
-	<Card.Footer class="flex gap-2 pt-3">
-		<Button variant="outline" class="flex-1" size="sm" onclick={() => (detailDialogOpen = true)}>
-			Show More
-		</Button>
-		<Button class="flex-1" size="sm">Contact</Button>
+	<Card.Footer class="flex flex-col gap-2 pt-3">
+		{#if showFeedback && jobId}
+			<div class="flex items-center justify-between border-t pt-2 -mx-6 px-6 -mb-2">
+				<div class="flex items-center gap-2">
+					{#if rankPosition}
+						<Badge variant="secondary" class="text-xs">
+							Rank #{rankPosition}
+						</Badge>
+					{/if}
+					<span class="text-xs text-muted-foreground">Feedback:</span>
+				</div>
+				<CandidateFeedback
+					talentId={talent.id}
+					{jobId}
+					expectedRank={rankPosition}
+					showStats={true}
+				/>
+			</div>
+		{/if}
+		<div class="flex gap-2">
+			<Button variant="outline" class="flex-1" size="sm" onclick={() => (detailDialogOpen = true)}>
+				Show More
+			</Button>
+			<Button class="flex-1" size="sm">Contact</Button>
+		</div>
 	</Card.Footer>
 </Card.Root>
 
