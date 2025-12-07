@@ -164,268 +164,250 @@ pub async fn create_application(
                                         // Check if there are any URLs to research
                                         let has_urls = github_url.is_some() || linkedin_url.is_some() || x_profile_url.is_some();
 
-                                        // Check if there are existing research results
-                                        let has_existing_results = talent.github_report_id.is_some()
-                                            || talent.linkedin_report_id.is_some()
-                                            || talent.twitter_report_id.is_some();
-
+                                        // Spawn social research as a SEPARATE task with guaranteed status update
+                                        // This ensures status is always updated even if outer task fails
                                         if has_urls {
-                                            // Set status to "pending" if there are existing results,
-                                            // otherwise "in_progress" for fresh research
-                                            let initial_status = if has_existing_results {
-                                                "pending"
-                                            } else {
-                                                "in_progress"
-                                            };
-                                            let _ = crate::database::update_talent_social_research_status(
-                                                &pool_clone,
-                                                talent_id.clone(),
-                                                initial_status,
-                                            ).await;
-                                        }
+                                            let pool_for_social = pool_clone.clone();
+                                            let talent_id_for_social = talent_id.clone();
+                                            let grok_url_for_social = grok_url.clone();
+                                            let collection_id_for_social = collection_id.clone();
+                                            let talent_for_social = talent.clone();
+                                            let talent_info_for_social = talent_info.clone();
+                                            let github_url_for_social = github_url.clone();
+                                            let linkedin_url_for_social = linkedin_url.clone();
+                                            let x_profile_url_for_social = x_profile_url.clone();
 
-                                        let mut research_handles = Vec::new();
+                                            // Spawn a completely separate task for social research
+                                            tokio::spawn(async move {
+                                                // Set status to in_progress at the START of this task
+                                                info!("[SOCIAL] Starting social research task for {}", talent_id_for_social);
+                                                let _ = crate::database::update_talent_social_research_status(
+                                                    &pool_for_social,
+                                                    talent_id_for_social.clone(),
+                                                    "in_progress",
+                                                ).await;
 
-                                        // GitHub research
-                                        if let Some(ref gh_url) = github_url {
-                                            let client = GrokClient::new(&grok_url);
-                                            let name = talent_info.name.clone();
-                                            let email = Some(talent_info.email.clone());
-                                            let profile_url = Some(gh_url.clone());
-                                            let coll_id = collection_id.clone();
-                                            let old_doc_id = talent.github_report_id.clone();
-                                            let pool_for_research = pool_clone.clone();
-                                            let tid_for_research = talent_id.clone();
+                                                // Use catch_unwind to ensure we ALWAYS update status
+                                                let research_future = async {
+                                                    let mut research_handles = Vec::new();
 
-                                            let handle = tokio::spawn(async move {
-                                                info!("[SOCIAL] Starting GitHub research for {}", name);
-                                                match client.research_platform(
-                                                    "github",
-                                                    &name,
-                                                    email.as_deref(),
-                                                    profile_url.as_deref(),
-                                                    coll_id.as_deref(),
-                                                    old_doc_id.as_deref(),
-                                                ).await {
-                                                    Ok(resp) if resp.success => {
-                                                        info!("[SOCIAL] GitHub research completed");
-                                                        let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
-                                                        // Store both document_id and tldr
-                                                        let _ = crate::database::update_talent_platform_research(
-                                                            &pool_for_research,
-                                                            tid_for_research,
-                                                            "github",
-                                                            resp.document_id.clone(),
-                                                            tldr,
-                                                        ).await;
-                                                        (Some("github".to_string()), resp.document_id)
-                                                    },
-                                                    Ok(resp) => {
-                                                        error!("[SOCIAL] GitHub research failed: {:?}", resp.error);
-                                                        (Some("github".to_string()), None)
-                                                    },
-                                                    Err(e) => {
-                                                        error!("[SOCIAL] GitHub research error: {}", e);
-                                                        (Some("github".to_string()), None)
+                                                    // GitHub research
+                                                    if let Some(ref gh_url) = github_url_for_social {
+                                                        let client = GrokClient::new(&grok_url_for_social);
+                                                        let name = talent_info_for_social.name.clone();
+                                                        let email = Some(talent_info_for_social.email.clone());
+                                                        let profile_url = Some(gh_url.clone());
+                                                        let coll_id = collection_id_for_social.clone();
+                                                        let old_doc_id = talent_for_social.github_report_id.clone();
+                                                        let pool_for_research = pool_for_social.clone();
+                                                        let tid_for_research = talent_id_for_social.clone();
+
+                                                        let handle = tokio::spawn(async move {
+                                                            info!("[SOCIAL] Starting GitHub research for {}", name);
+                                                            match client.research_platform(
+                                                                "github",
+                                                                &name,
+                                                                email.as_deref(),
+                                                                profile_url.as_deref(),
+                                                                coll_id.as_deref(),
+                                                                old_doc_id.as_deref(),
+                                                            ).await {
+                                                                Ok(resp) if resp.success => {
+                                                                    info!("[SOCIAL] GitHub research completed successfully");
+                                                                    let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    let _ = crate::database::update_talent_platform_research(
+                                                                        &pool_for_research,
+                                                                        tid_for_research,
+                                                                        "github",
+                                                                        resp.document_id.clone(),
+                                                                        tldr,
+                                                                    ).await;
+                                                                    ("github".to_string(), resp.document_id)
+                                                                },
+                                                                Ok(resp) => {
+                                                                    error!("[SOCIAL] GitHub research API failed: {:?}", resp.error);
+                                                                    ("github".to_string(), None)
+                                                                },
+                                                                Err(e) => {
+                                                                    error!("[SOCIAL] GitHub research error (timeout?): {}", e);
+                                                                    ("github".to_string(), None)
+                                                                }
+                                                            }
+                                                        });
+                                                        research_handles.push(handle);
                                                     }
-                                                }
-                                            });
-                                            research_handles.push(handle);
-                                        }
 
-                                        // LinkedIn research
-                                        if let Some(ref li_url) = linkedin_url {
-                                            let client = GrokClient::new(&grok_url);
-                                            let name = talent_info.name.clone();
-                                            let email = Some(talent_info.email.clone());
-                                            let profile_url = Some(li_url.clone());
-                                            let coll_id = collection_id.clone();
-                                            let old_doc_id = talent.linkedin_report_id.clone();
-                                            let pool_for_research = pool_clone.clone();
-                                            let tid_for_research = talent_id.clone();
+                                                    // LinkedIn research
+                                                    if let Some(ref li_url) = linkedin_url_for_social {
+                                                        let client = GrokClient::new(&grok_url_for_social);
+                                                        let name = talent_info_for_social.name.clone();
+                                                        let email = Some(talent_info_for_social.email.clone());
+                                                        let profile_url = Some(li_url.clone());
+                                                        let coll_id = collection_id_for_social.clone();
+                                                        let old_doc_id = talent_for_social.linkedin_report_id.clone();
+                                                        let pool_for_research = pool_for_social.clone();
+                                                        let tid_for_research = talent_id_for_social.clone();
 
-                                            let handle = tokio::spawn(async move {
-                                                info!("[SOCIAL] Starting LinkedIn research for {}", name);
-                                                match client.research_platform(
-                                                    "linkedin",
-                                                    &name,
-                                                    email.as_deref(),
-                                                    profile_url.as_deref(),
-                                                    coll_id.as_deref(),
-                                                    old_doc_id.as_deref(),
-                                                ).await {
-                                                    Ok(resp) if resp.success => {
-                                                        info!("[SOCIAL] LinkedIn research completed");
-                                                        let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
-                                                        // Store both document_id and tldr
-                                                        let _ = crate::database::update_talent_platform_research(
-                                                            &pool_for_research,
-                                                            tid_for_research,
-                                                            "linkedin",
-                                                            resp.document_id.clone(),
-                                                            tldr,
-                                                        ).await;
-                                                        (Some("linkedin".to_string()), resp.document_id)
-                                                    },
-                                                    Ok(resp) => {
-                                                        error!("[SOCIAL] LinkedIn research failed: {:?}", resp.error);
-                                                        (Some("linkedin".to_string()), None)
-                                                    },
-                                                    Err(e) => {
-                                                        error!("[SOCIAL] LinkedIn research error: {}", e);
-                                                        (Some("linkedin".to_string()), None)
+                                                        let handle = tokio::spawn(async move {
+                                                            info!("[SOCIAL] Starting LinkedIn research for {}", name);
+                                                            match client.research_platform(
+                                                                "linkedin",
+                                                                &name,
+                                                                email.as_deref(),
+                                                                profile_url.as_deref(),
+                                                                coll_id.as_deref(),
+                                                                old_doc_id.as_deref(),
+                                                            ).await {
+                                                                Ok(resp) if resp.success => {
+                                                                    info!("[SOCIAL] LinkedIn research completed successfully");
+                                                                    let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    let _ = crate::database::update_talent_platform_research(
+                                                                        &pool_for_research,
+                                                                        tid_for_research,
+                                                                        "linkedin",
+                                                                        resp.document_id.clone(),
+                                                                        tldr,
+                                                                    ).await;
+                                                                    ("linkedin".to_string(), resp.document_id)
+                                                                },
+                                                                Ok(resp) => {
+                                                                    error!("[SOCIAL] LinkedIn research API failed: {:?}", resp.error);
+                                                                    ("linkedin".to_string(), None)
+                                                                },
+                                                                Err(e) => {
+                                                                    error!("[SOCIAL] LinkedIn research error (timeout?): {}", e);
+                                                                    ("linkedin".to_string(), None)
+                                                                }
+                                                            }
+                                                        });
+                                                        research_handles.push(handle);
                                                     }
-                                                }
-                                            });
-                                            research_handles.push(handle);
-                                        }
 
-                                        // Twitter/X research (using x_url from resume OR constructed from handle)
-                                        if let Some(ref tw_url) = x_profile_url {
-                                            let client = GrokClient::new(&grok_url);
-                                            let name = talent_info.name.clone();
-                                            let email = Some(talent_info.email.clone());
-                                            let profile_url = Some(tw_url.clone());
-                                            info!("[SOCIAL] Twitter/X profile URL: {}", tw_url);
-                                            let coll_id = collection_id.clone();
-                                            let old_doc_id = talent.twitter_report_id.clone();
-                                            let pool_for_research = pool_clone.clone();
-                                            let tid_for_research = talent_id.clone();
+                                                    // Twitter/X research
+                                                    if let Some(ref tw_url) = x_profile_url_for_social {
+                                                        let client = GrokClient::new(&grok_url_for_social);
+                                                        let name = talent_info_for_social.name.clone();
+                                                        let email = Some(talent_info_for_social.email.clone());
+                                                        let profile_url = Some(tw_url.clone());
+                                                        info!("[SOCIAL] Twitter/X profile URL: {}", tw_url);
+                                                        let coll_id = collection_id_for_social.clone();
+                                                        let old_doc_id = talent_for_social.twitter_report_id.clone();
+                                                        let pool_for_research = pool_for_social.clone();
+                                                        let tid_for_research = talent_id_for_social.clone();
 
-                                            let handle = tokio::spawn(async move {
-                                                info!("[SOCIAL] Starting Twitter research for {}", name);
-                                                match client.research_platform(
-                                                    "twitter",
-                                                    &name,
-                                                    email.as_deref(),
-                                                    profile_url.as_deref(),
-                                                    coll_id.as_deref(),
-                                                    old_doc_id.as_deref(),
-                                                ).await {
-                                                    Ok(resp) if resp.success => {
-                                                        info!("[SOCIAL] Twitter research completed");
-                                                        let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
-                                                        // Store both document_id and tldr
-                                                        let _ = crate::database::update_talent_platform_research(
-                                                            &pool_for_research,
-                                                            tid_for_research,
-                                                            "twitter",
-                                                            resp.document_id.clone(),
-                                                            tldr,
-                                                        ).await;
-                                                        (Some("twitter".to_string()), resp.document_id)
-                                                    },
-                                                    Ok(resp) => {
-                                                        error!("[SOCIAL] Twitter research failed: {:?}", resp.error);
-                                                        (Some("twitter".to_string()), None)
-                                                    },
-                                                    Err(e) => {
-                                                        error!("[SOCIAL] Twitter research error: {}", e);
-                                                        (Some("twitter".to_string()), None)
+                                                        let handle = tokio::spawn(async move {
+                                                            info!("[SOCIAL] Starting Twitter research for {}", name);
+                                                            match client.research_platform(
+                                                                "twitter",
+                                                                &name,
+                                                                email.as_deref(),
+                                                                profile_url.as_deref(),
+                                                                coll_id.as_deref(),
+                                                                old_doc_id.as_deref(),
+                                                            ).await {
+                                                                Ok(resp) if resp.success => {
+                                                                    info!("[SOCIAL] Twitter research completed successfully");
+                                                                    let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    let _ = crate::database::update_talent_platform_research(
+                                                                        &pool_for_research,
+                                                                        tid_for_research,
+                                                                        "twitter",
+                                                                        resp.document_id.clone(),
+                                                                        tldr,
+                                                                    ).await;
+                                                                    ("twitter".to_string(), resp.document_id)
+                                                                },
+                                                                Ok(resp) => {
+                                                                    error!("[SOCIAL] Twitter research API failed: {:?}", resp.error);
+                                                                    ("twitter".to_string(), None)
+                                                                },
+                                                                Err(e) => {
+                                                                    error!("[SOCIAL] Twitter research error (timeout?): {}", e);
+                                                                    ("twitter".to_string(), None)
+                                                                }
+                                                            }
+                                                        });
+                                                        research_handles.push(handle);
                                                     }
-                                                }
-                                            });
-                                            research_handles.push(handle);
-                                        }
 
-                                        // Wait for all research to complete with a global timeout
-                                        // Individual requests have 5min timeout, global timeout is 10min
-                                        let global_timeout = std::time::Duration::from_secs(600);
+                                                    // Wait for all with timeout (5 min per request + buffer = 10 min total)
+                                                    let global_timeout = std::time::Duration::from_secs(600);
+                                                    let expected_count = research_handles.len();
 
-                                        let research_result = tokio::time::timeout(global_timeout, async {
-                                            let mut github_report_id: Option<String> = None;
-                                            let mut linkedin_report_id: Option<String> = None;
-                                            let mut twitter_report_id: Option<String> = None;
+                                                    let results = tokio::time::timeout(global_timeout, async {
+                                                        let mut results = Vec::new();
+                                                        for handle in research_handles {
+                                                            match handle.await {
+                                                                Ok((platform, doc_id)) => results.push((platform, doc_id)),
+                                                                Err(e) => {
+                                                                    error!("[SOCIAL] Task join error: {:?}", e);
+                                                                    results.push(("unknown".to_string(), None));
+                                                                }
+                                                            }
+                                                        }
+                                                        results
+                                                    }).await;
 
-                                            for handle in research_handles {
-                                                match handle.await {
-                                                    Ok((platform, doc_id)) => {
-                                                        match platform.as_deref() {
-                                                            Some("github") => github_report_id = doc_id,
-                                                            Some("linkedin") => linkedin_report_id = doc_id,
-                                                            Some("twitter") => twitter_report_id = doc_id,
-                                                            _ => {}
+                                                    match results {
+                                                        Ok(results) => Ok((results, expected_count)),
+                                                        Err(_) => {
+                                                            error!("[SOCIAL] Global timeout (10 min) exceeded!");
+                                                            Err("timeout")
+                                                        }
+                                                    }
+                                                };
+
+                                                // Execute research and get result
+                                                let research_outcome = research_future.await;
+
+                                                // ALWAYS update status - this is the critical part
+                                                let (final_status, reason) = match research_outcome {
+                                                    Ok((results, expected)) => {
+                                                        let mut gh_id = None;
+                                                        let mut li_id = None;
+                                                        let mut tw_id = None;
+                                                        let mut success_count = 0;
+
+                                                        for (platform, doc_id) in &results {
+                                                            if doc_id.is_some() {
+                                                                success_count += 1;
+                                                            }
+                                                            match platform.as_str() {
+                                                                "github" => gh_id = doc_id.clone(),
+                                                                "linkedin" => li_id = doc_id.clone(),
+                                                                "twitter" => tw_id = doc_id.clone(),
+                                                                _ => {}
+                                                            }
+                                                        }
+
+                                                        // Update report IDs if any succeeded
+                                                        if success_count > 0 {
+                                                            let _ = crate::database::update_talent_social_report_ids(
+                                                                &pool_for_social,
+                                                                talent_id_for_social.clone(),
+                                                                gh_id,
+                                                                li_id,
+                                                                tw_id,
+                                                                None,
+                                                            ).await;
+                                                        }
+
+                                                        if success_count == 0 {
+                                                            ("failed", format!("0/{} platforms succeeded", expected))
+                                                        } else {
+                                                            ("completed", format!("{}/{} platforms succeeded", success_count, expected))
                                                         }
                                                     },
-                                                    Err(e) => {
-                                                        error!("[SOCIAL] Task join error: {:?}", e);
-                                                    }
-                                                }
-                                            }
+                                                    Err(_) => ("failed", "global timeout exceeded".to_string()),
+                                                };
 
-                                            (github_report_id, linkedin_report_id, twitter_report_id)
-                                        }).await;
-
-                                        // Process results or handle timeout
-                                        let (github_report_id, linkedin_report_id, twitter_report_id, timed_out) = match research_result {
-                                            Ok((gh, li, tw)) => (gh, li, tw, false),
-                                            Err(_) => {
-                                                error!("======================================================================");
-                                                error!("SOCIAL RESEARCH: Global timeout exceeded (10 minutes)");
-                                                error!("======================================================================");
-                                                (None, None, None, true)
-                                            }
-                                        };
-
-                                        // Determine final status based on results
-                                        let any_success = github_report_id.is_some() || linkedin_report_id.is_some() || twitter_report_id.is_some();
-                                        let expected_count = [github_url.is_some(), linkedin_url.is_some(), x_profile_url.is_some()].iter().filter(|&&x| x).count();
-                                        let success_count = [github_report_id.is_some(), linkedin_report_id.is_some(), twitter_report_id.is_some()].iter().filter(|&&x| x).count();
-
-                                        // Update talent with social report IDs
-                                        if any_success {
-                                            info!("======================================================================");
-                                            info!("SOCIAL RESEARCH: Updating talent with report IDs");
-                                            info!("GitHub: {:?}", github_report_id);
-                                            info!("LinkedIn: {:?}", linkedin_report_id);
-                                            info!("Twitter: {:?}", twitter_report_id);
-                                            info!("======================================================================");
-
-                                            match crate::database::update_talent_social_report_ids(
-                                                &pool_clone,
-                                                talent_id.clone(),
-                                                github_report_id,
-                                                linkedin_report_id,
-                                                twitter_report_id,
-                                                None, // stackoverflow
-                                            ).await {
-                                                Ok(_) => {
-                                                    info!("SUCCESS: Updated talent {} with social report IDs", talent_id);
-                                                },
-                                                Err(e) => {
-                                                    error!("FAILED to update talent {} with social report IDs: {}", talent_id, e);
-                                                }
-                                            }
-                                        }
-
-                                        // Update status based on results (ALWAYS runs, even on timeout)
-                                        if has_urls {
-                                            let final_status = if timed_out {
-                                                "failed"  // timeout is always a failure
-                                            } else if success_count == 0 {
-                                                "failed"
-                                            } else if success_count < expected_count {
-                                                "completed"  // partial success is still completed
-                                            } else {
-                                                "completed"
-                                            };
-
-                                            let status_reason = if timed_out {
-                                                "global timeout"
-                                            } else if success_count == 0 {
-                                                "all platforms failed"
-                                            } else {
-                                                "research completed"
-                                            };
-
-                                            info!("SOCIAL RESEARCH: Setting status to '{}' ({}/{} succeeded, reason: {})",
-                                                final_status, success_count, expected_count, status_reason);
-
-                                            let _ = crate::database::update_talent_social_research_status(
-                                                &pool_clone,
-                                                talent_id.clone(),
-                                                final_status,
-                                            ).await;
+                                                info!("[SOCIAL] Final status update: {} ({})", final_status, reason);
+                                                let _ = crate::database::update_talent_social_research_status(
+                                                    &pool_for_social,
+                                                    talent_id_for_social,
+                                                    final_status,
+                                                ).await;
+                                            });
                                         }
                                     },
                                     Err(e) => {
