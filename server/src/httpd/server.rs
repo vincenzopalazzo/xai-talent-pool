@@ -12,6 +12,9 @@ use super::jobs::{
 use super::applications::{
     create_application, get_application, get_applications_by_talent, get_applications_by_job, get_application_resume, delete_application, delete_applications_bulk,
 };
+use super::reorder::{
+    reorder_candidates, get_preferences_for_job, get_reorder_events_for_job,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -113,6 +116,10 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str, gro
             .service(get_application)
             .service(delete_application)
             .service(delete_applications_bulk)
+            // Reorder routes
+            .service(reorder_candidates)
+            .service(get_preferences_for_job)
+            .service(get_reorder_events_for_job)
             .build()
     })
     .bind(&bind_address)?

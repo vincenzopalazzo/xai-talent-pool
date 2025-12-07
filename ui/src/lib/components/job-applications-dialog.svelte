@@ -18,7 +18,8 @@
 		ExternalLink,
 		Trash2,
 		CheckSquare,
-		X
+		X,
+		GripVertical
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
 	import type { Job, Application, Talent } from '$lib/types';
@@ -49,6 +50,11 @@
 	let previewDialogOpen = $state(false);
 	let previewApplicationId = $state<string>('');
 	let previewFilename = $state<string>('Resume');
+
+	// Drag-and-drop state
+	let draggedIndex = $state<number | null>(null);
+	let dragOverIndex = $state<number | null>(null);
+	let isSavingReorder = $state(false);
 
 	// Fetch applications when dialog opens
 	$effect(() => {
@@ -187,6 +193,81 @@
 			isDeleting = false;
 		}
 	}
+
+	// Drag-and-drop handlers
+	function handleDragStart(index: number) {
+		draggedIndex = index;
+	}
+
+	function handleDragOver(event: DragEvent, index: number) {
+		event.preventDefault();
+		dragOverIndex = index;
+	}
+
+	function handleDragEnd() {
+		draggedIndex = null;
+		dragOverIndex = null;
+	}
+
+	async function handleDrop(event: DragEvent, dropIndex: number) {
+		event.preventDefault();
+
+		if (draggedIndex === null || draggedIndex === dropIndex) {
+			handleDragEnd();
+			return;
+		}
+
+		// Capture before order
+		const beforeOrder = applications.map((app) => app.talent_id);
+
+		// Reorder applications array
+		const newApplications = [...applications];
+		const [draggedApp] = newApplications.splice(draggedIndex, 1);
+		newApplications.splice(dropIndex, 0, draggedApp);
+		applications = newApplications;
+
+		// Capture after order
+		const afterOrder = applications.map((app) => app.talent_id);
+
+		handleDragEnd();
+
+		// Save reorder event to backend
+		await saveReorderEvent(beforeOrder, afterOrder, draggedApp.talent_id);
+	}
+
+	async function saveReorderEvent(
+		beforeOrder: string[],
+		afterOrder: string[],
+		movedTalentId: string
+	) {
+		isSavingReorder = true;
+
+		try {
+			const response = await fetch('http://localhost:8080/api/v1/reorder', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify({
+					job_id: job.id,
+					before_order: beforeOrder,
+					after_order: afterOrder,
+					moved_talent_id: movedTalentId
+				})
+			});
+
+			if (!response.ok) {
+				console.error('Failed to save reorder event');
+			} else {
+				const result = await response.json();
+				console.log(`Reorder saved: ${result.preferences_created} preferences created`);
+			}
+		} catch (err) {
+			console.error('Error saving reorder:', err);
+		} finally {
+			isSavingReorder = false;
+		}
+	}
 </script>
 
 <Dialog.Root bind:open>
@@ -247,8 +328,17 @@
 				</div>
 			{:else}
 				<div class="space-y-4">
-					{#each applications as app (app.id)}
-						<div class="rounded-lg border p-4 {selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}">
+					{#each applications as app, index (app.id)}
+						<div
+							class="rounded-lg border p-4 transition-all {draggedIndex === index
+								? 'opacity-50'
+								: ''} {dragOverIndex === index || selectedApplications.has(app.id) ? 'ring-2 ring-primary' : ''}"
+							draggable={!selectionMode}
+							ondragstart={() => !selectionMode && handleDragStart(index)}
+							ondragover={(e) => !selectionMode && handleDragOver(e, index)}
+							ondragend={() => !selectionMode && handleDragEnd()}
+							ondrop={(e) => !selectionMode && handleDrop(e, index)}
+						>
 							<div class="flex items-start justify-between gap-4">
 								<div class="flex items-start gap-3">
 									{#if selectionMode}
@@ -257,6 +347,14 @@
 											onCheckedChange={(checked) => handleSelectionChange(app.id, checked)}
 											class="mt-1 h-5 w-5"
 										/>
+									{:else}
+										<!-- Drag handle -->
+										<div
+											class="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground"
+											aria-label="Drag to reorder"
+										>
+											<GripVertical class="h-5 w-5" />
+										</div>
 									{/if}
 									<Avatar.Root class="h-10 w-10">
 										{#if app.talent?.avatar}
