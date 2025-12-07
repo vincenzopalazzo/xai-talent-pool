@@ -66,7 +66,7 @@ async def initial_screening(
         resume_content = await resume.read()
         resume_text = extract_text_from_pdf(resume_content)
     except Exception as e:
-        logger.error(f"Failed to extract text from PDF: {e}")
+        logger.error("Failed to extract text from PDF: %s", e)
         raise HTTPException(
             status_code=400,
             detail=f"Failed to parse PDF: {e}",
@@ -100,7 +100,7 @@ async def initial_screening(
         grok_service = GrokService()
         analysis = grok_service.analyze_resume(resume_text)
     except Exception as e:
-        logger.error(f"Grok analysis failed: {e}")
+        logger.error("Grok analysis failed: %s", e)
         return ScreeningResponse(
             success=False,
             result=None,
