@@ -259,10 +259,16 @@ def _extract_tldr(content: str) -> str:
 class CandidateResearchService:
     """Service for researching candidates across platforms using Grok AI."""
 
+    # Timeout for agentic tool calling (1 hour as recommended by xAI docs)
+    # Default is 900 seconds which can cause DEADLINE_EXCEEDED errors
+    # See: https://docs.x.ai/docs/guides/tools/overview
+    AGENTIC_TIMEOUT = 3600
+
     def __init__(self) -> None:
         """Initialize the candidate research service."""
         self.settings = get_settings()
-        self.client = Client()
+        # Set longer timeout for agentic tool calling which can take a while
+        self.client = Client(timeout=self.AGENTIC_TIMEOUT)
 
     def search_platform(
         self,
