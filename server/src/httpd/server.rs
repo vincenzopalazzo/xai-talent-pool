@@ -12,6 +12,10 @@ use super::jobs::{
 use super::applications::{
     create_application, get_application, get_applications_by_talent, get_applications_by_job, get_application_resume,
 };
+use super::hiring_requirements::{
+    get_hiring_requirements, create_hiring_requirement, get_hiring_requirement,
+    get_hiring_requirements_by_job, update_hiring_requirement, delete_hiring_requirement,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -110,6 +114,13 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str, gro
             .service(get_applications_by_job)
             .service(get_application_resume)
             .service(get_application)
+            // Hiring Requirements routes
+            .service(get_hiring_requirements)
+            .service(create_hiring_requirement)
+            .service(get_hiring_requirements_by_job)
+            .service(get_hiring_requirement)
+            .service(update_hiring_requirement)
+            .service(delete_hiring_requirement)
             .build()
     })
     .bind(&bind_address)?

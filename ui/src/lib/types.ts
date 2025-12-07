@@ -62,3 +62,12 @@ export interface Application {
 	// Populated from talent lookup
 	talent?: Talent;
 }
+
+export interface HiringRequirement {
+	id: string;
+	job_id?: string;
+	title: string;
+	company_name: string;
+	requirements_text: string;
+	created_at: string;
+}
