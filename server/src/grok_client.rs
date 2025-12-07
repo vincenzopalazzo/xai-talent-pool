@@ -127,9 +127,15 @@ pub struct GrokClient {
 impl GrokClient {
     /// Create a new Grok client
     pub fn new(base_url: &str) -> Self {
+        // Use a 5-minute timeout for agentic tool calling which can take a while
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(300))
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
+
         Self {
             base_url: base_url.trim_end_matches('/').to_string(),
-            client: reqwest::Client::new(),
+            client,
         }
     }
 

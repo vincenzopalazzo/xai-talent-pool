@@ -328,21 +328,44 @@ pub async fn create_application(
                                             research_handles.push(handle);
                                         }
 
-                                        // Wait for all research to complete and collect results
-                                        let mut github_report_id: Option<String> = None;
-                                        let mut linkedin_report_id: Option<String> = None;
-                                        let mut twitter_report_id: Option<String> = None;
+                                        // Wait for all research to complete with a global timeout
+                                        // Individual requests have 5min timeout, global timeout is 10min
+                                        let global_timeout = std::time::Duration::from_secs(600);
 
-                                        for handle in research_handles {
-                                            if let Ok((platform, doc_id)) = handle.await {
-                                                match platform.as_deref() {
-                                                    Some("github") => github_report_id = doc_id,
-                                                    Some("linkedin") => linkedin_report_id = doc_id,
-                                                    Some("twitter") => twitter_report_id = doc_id,
-                                                    _ => {}
+                                        let research_result = tokio::time::timeout(global_timeout, async {
+                                            let mut github_report_id: Option<String> = None;
+                                            let mut linkedin_report_id: Option<String> = None;
+                                            let mut twitter_report_id: Option<String> = None;
+
+                                            for handle in research_handles {
+                                                match handle.await {
+                                                    Ok((platform, doc_id)) => {
+                                                        match platform.as_deref() {
+                                                            Some("github") => github_report_id = doc_id,
+                                                            Some("linkedin") => linkedin_report_id = doc_id,
+                                                            Some("twitter") => twitter_report_id = doc_id,
+                                                            _ => {}
+                                                        }
+                                                    },
+                                                    Err(e) => {
+                                                        error!("[SOCIAL] Task join error: {:?}", e);
+                                                    }
                                                 }
                                             }
-                                        }
+
+                                            (github_report_id, linkedin_report_id, twitter_report_id)
+                                        }).await;
+
+                                        // Process results or handle timeout
+                                        let (github_report_id, linkedin_report_id, twitter_report_id, timed_out) = match research_result {
+                                            Ok((gh, li, tw)) => (gh, li, tw, false),
+                                            Err(_) => {
+                                                error!("======================================================================");
+                                                error!("SOCIAL RESEARCH: Global timeout exceeded (10 minutes)");
+                                                error!("======================================================================");
+                                                (None, None, None, true)
+                                            }
+                                        };
 
                                         // Determine final status based on results
                                         let any_success = github_report_id.is_some() || linkedin_report_id.is_some() || twitter_report_id.is_some();
@@ -375,9 +398,11 @@ pub async fn create_application(
                                             }
                                         }
 
-                                        // Update status based on results
+                                        // Update status based on results (ALWAYS runs, even on timeout)
                                         if has_urls {
-                                            let final_status = if success_count == 0 {
+                                            let final_status = if timed_out {
+                                                "failed"  // timeout is always a failure
+                                            } else if success_count == 0 {
                                                 "failed"
                                             } else if success_count < expected_count {
                                                 "completed"  // partial success is still completed
@@ -385,7 +410,16 @@ pub async fn create_application(
                                                 "completed"
                                             };
 
-                                            info!("SOCIAL RESEARCH: Setting status to '{}' ({}/{} succeeded)", final_status, success_count, expected_count);
+                                            let status_reason = if timed_out {
+                                                "global timeout"
+                                            } else if success_count == 0 {
+                                                "all platforms failed"
+                                            } else {
+                                                "research completed"
+                                            };
+
+                                            info!("SOCIAL RESEARCH: Setting status to '{}' ({}/{} succeeded, reason: {})",
+                                                final_status, success_count, expected_count, status_reason);
 
                                             let _ = crate::database::update_talent_social_research_status(
                                                 &pool_clone,
