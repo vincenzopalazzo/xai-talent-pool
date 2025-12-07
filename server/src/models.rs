@@ -173,6 +173,35 @@ pub struct UpdateJobRequest {
     pub expires_at: Option<String>,
 }
 
+// Job Match models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]
+pub struct JobMatch {
+    pub id: String,
+    pub job_id: String,
+    pub talent_id: String,
+    pub score: f64,
+    pub rank: i32,
+    pub match_reasons: Option<String>,  // JSON array
+    pub concerns: Option<String>,        // JSON array
+    pub summary: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct JobMatchWithTalent {
+    pub id: String,
+    pub job_id: String,
+    pub talent_id: String,
+    pub score: f64,
+    pub rank: i32,
+    pub match_reasons: Vec<String>,
+    pub concerns: Vec<String>,
+    pub summary: String,
+    pub created_at: String,
+    pub talent: Option<Talent>,
+}
+
 // Application models
 
 #[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]

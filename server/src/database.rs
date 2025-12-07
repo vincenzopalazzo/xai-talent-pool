@@ -1,5 +1,5 @@
 use sqlx::SqlitePool;
-use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application, ReorderEvent, PairwisePreference};
+use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application, JobMatch, ReorderEvent, PairwisePreference};
 
 pub type Pool = SqlitePool;
 
@@ -55,6 +55,12 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
     let reorder_schema = include_str!("../migrations/009_create_reorder_tables.sql");
     for statement in reorder_schema.split(';').filter(|s| !s.trim().is_empty()) {
         sqlx::query(statement).execute(&pool).await?;
+    }
+
+    // Create job_matches table
+    let job_matches_schema = include_str!("../migrations/010_create_job_matches_table.sql");
+    for statement in job_matches_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
     }
 
     Ok(pool)
@@ -385,6 +391,67 @@ pub async fn update_talent_candidate_score(
     .bind(score_details)
     .bind(id)
     .fetch_optional(pool)
+    .await
+}
+
+// Job Match database functions
+
+/// Create a job match
+pub async fn create_job_match(pool: &Pool, job_match: &JobMatch) -> Result<JobMatch, sqlx::Error> {
+    sqlx::query_as::<_, JobMatch>(
+        r#"
+        INSERT INTO job_matches (id, job_id, talent_id, score, rank, match_reasons, concerns, summary, created_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        RETURNING *
+        "#,
+    )
+    .bind(&job_match.id)
+    .bind(&job_match.job_id)
+    .bind(&job_match.talent_id)
+    .bind(job_match.score)
+    .bind(job_match.rank)
+    .bind(&job_match.match_reasons)
+    .bind(&job_match.concerns)
+    .bind(&job_match.summary)
+    .bind(&job_match.created_at)
+    .fetch_one(pool)
+    .await
+}
+
+/// Get all job matches for a job, ordered by rank
+pub async fn get_job_matches(pool: &Pool, job_id: &str) -> Result<Vec<JobMatch>, sqlx::Error> {
+    sqlx::query_as::<_, JobMatch>(
+        r#"
+        SELECT * FROM job_matches
+        WHERE job_id = ?
+        ORDER BY rank ASC
+        "#,
+    )
+    .bind(job_id)
+    .fetch_all(pool)
+    .await
+}
+
+/// Delete all job matches for a job
+pub async fn delete_job_matches_by_job_id(pool: &Pool, job_id: &str) -> Result<u64, sqlx::Error> {
+    let rows = sqlx::query("DELETE FROM job_matches WHERE job_id = ?")
+        .bind(job_id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    Ok(rows)
+}
+
+/// Get talents with collections (for job matching)
+pub async fn get_talents_with_collections(pool: &Pool) -> Result<Vec<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        r#"
+        SELECT * FROM talents
+        WHERE collection_id IS NOT NULL
+        AND collection_id != ''
+        "#,
+    )
+    .fetch_all(pool)
     .await
 }
 

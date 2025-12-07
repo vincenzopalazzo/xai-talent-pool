@@ -252,3 +252,68 @@ class CandidateScoringResponse(BaseModel):
     success: bool = Field(..., description="Whether scoring was successful")
     result: CandidateScoringResult | None = Field(None, description="Scoring result")
     error: str | None = Field(None, description="Error message if failed")
+
+
+# Job Matching models
+
+
+class TalentForMatching(BaseModel):
+    """Talent info for job matching."""
+
+    id: str = Field(..., description="Talent ID")
+    name: str = Field(..., description="Talent name")
+    title: str = Field("", description="Current job title")
+    skills: str = Field("", description="Comma-separated skills")
+    experience: str = Field("", description="Experience level")
+    collection_id: str = Field(
+        ..., description="Collection ID with candidate documents"
+    )
+
+
+class JobMatchingRequest(BaseModel):
+    """Request for matching candidates to a job."""
+
+    job_id: str = Field(..., description="Job ID")
+    job_title: str = Field(..., description="Job title")
+    job_description: str = Field(..., description="Job description")
+    company_name: str = Field(..., description="Company name")
+    skills_required: str = Field("", description="Required skills")
+    experience_level: str = Field("", description="Required experience level")
+    candidates: list[TalentForMatching] = Field(
+        ..., description="List of candidates to evaluate"
+    )
+    top_n: int = Field(10, description="Number of top candidates to return")
+
+
+class CandidateMatch(BaseModel):
+    """A single candidate match result."""
+
+    talent_id: str = Field(..., description="Talent ID")
+    talent_name: str = Field(..., description="Talent name")
+    talent_title: str = Field("", description="Talent's current title")
+    score: float = Field(..., description="Match score (0-100)")
+    rank: int = Field(..., description="Rank position (1 = best)")
+    match_reasons: list[str] = Field(
+        default_factory=list, description="Reasons for the match"
+    )
+    concerns: list[str] = Field(default_factory=list, description="Potential concerns")
+    summary: str = Field("", description="Brief summary of why this candidate matches")
+
+
+class JobMatchingResult(BaseModel):
+    """Result of job matching."""
+
+    job_id: str = Field(..., description="Job ID")
+    matches: list[CandidateMatch] = Field(
+        default_factory=list, description="Ranked candidate matches"
+    )
+    total_evaluated: int = Field(0, description="Total candidates evaluated")
+    timestamp: str = Field(..., description="Matching timestamp (ISO 8601)")
+
+
+class JobMatchingResponse(BaseModel):
+    """Response for job matching."""
+
+    success: bool = Field(..., description="Whether matching was successful")
+    result: JobMatchingResult | None = Field(None, description="Matching result")
+    error: str | None = Field(None, description="Error message if failed")

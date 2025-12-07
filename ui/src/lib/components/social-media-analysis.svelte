@@ -68,7 +68,7 @@
 	}
 
 	// Parse social analysis JSON if needed
-	const parsedAnalysis = $derived((): SocialMediaAnalysis | null => {
+	const parsedAnalysis = $derived.by((): SocialMediaAnalysis | null => {
 		if (!analysis) return null;
 		// If it's a string, parse it
 		if (typeof analysis === 'string') {

@@ -110,3 +110,16 @@ export interface Application {
 	// Populated from talent lookup
 	talent?: Talent;
 }
+
+export interface JobMatch {
+	id: string;
+	job_id: string;
+	talent_id: string;
+	score: number;
+	rank: number;
+	match_reasons: string[];
+	concerns: string[];
+	summary: string;
+	created_at: string;
+	talent?: Talent;
+}
