@@ -6,7 +6,7 @@
 	import { Textarea } from '$lib/components/ui/textarea';
 	import { Badge } from '$lib/components/ui/badge';
 	import { Separator } from '$lib/components/ui/separator';
-	import { Loader2, CheckCircle2, User, Mail, Briefcase, MapPin } from 'lucide-svelte';
+	import { Loader2, CheckCircle2, User, Mail, Briefcase, MapPin, FileText, Upload, X } from 'lucide-svelte';
 	import type { Job, Talent } from '$lib/types';
 
 	let {
@@ -50,6 +50,44 @@
 	let skills = $state('');
 	let bio = $state('');
 
+	// Resume upload
+	let resumeFile = $state<File | null>(null);
+	let resumeData = $state<string | null>(null);
+	let coverLetter = $state('');
+
+	// Convert file to base64
+	async function handleResumeSelect(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (file) {
+			// Validate file type
+			const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'];
+			if (!allowedTypes.includes(file.type)) {
+				error = 'Please upload a PDF or Word document';
+				return;
+			}
+			// Validate file size (5MB max)
+			if (file.size > 5 * 1024 * 1024) {
+				error = 'File size must be less than 5MB';
+				return;
+			}
+			resumeFile = file;
+			// Convert to base64
+			const reader = new FileReader();
+			reader.onload = () => {
+				const base64 = (reader.result as string).split(',')[1];
+				resumeData = base64;
+			};
+			reader.readAsDataURL(file);
+			error = null;
+		}
+	}
+
+	function removeResume() {
+		resumeFile = null;
+		resumeData = null;
+	}
+
 	function resetForm() {
 		step = 'email';
 		email = '';
@@ -61,6 +99,9 @@
 		experience = '';
 		skills = '';
 		bio = '';
+		resumeFile = null;
+		resumeData = null;
+		coverLetter = '';
 		error = null;
 		isLoading = false;
 	}
@@ -100,12 +141,40 @@
 	}
 
 	async function applyWithExisting() {
+		if (!existingTalent) return;
+
 		isLoading = true;
-		// For now we just simulate the application
-		// In a real app, you'd call an apply API endpoint
-		await new Promise((resolve) => setTimeout(resolve, 500));
-		step = 'success';
-		isLoading = false;
+		error = null;
+
+		try {
+			const payload = {
+				talent_id: existingTalent.id,
+				job_id: job.id,
+				resume_data: resumeData,
+				resume_filename: resumeFile?.name || null,
+				resume_content_type: resumeFile?.type || null,
+				cover_letter: coverLetter.trim() || null
+			};
+
+			const response = await fetch('http://localhost:8080/api/v1/applications', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(payload)
+			});
+
+			if (!response.ok) {
+				const errorData = await response.text();
+				throw new Error(errorData || 'Failed to submit application');
+			}
+
+			step = 'success';
+		} catch (err) {
+			error = err instanceof Error ? err.message : 'An error occurred';
+		} finally {
+			isLoading = false;
+		}
 	}
 
 	async function createAndApply() {
@@ -130,7 +199,8 @@
 		error = null;
 
 		try {
-			const payload = {
+			// First, create the talent profile
+			const talentPayload = {
 				name: name.trim(),
 				email: email.trim(),
 				handle: handle.trim(),
@@ -142,17 +212,42 @@
 				verified: false
 			};
 
-			const response = await fetch('http://localhost:8080/api/v1/talents', {
+			const talentResponse = await fetch('http://localhost:8080/api/v1/talents', {
 				method: 'POST',
 				headers: {
 					'Content-Type': 'application/json'
 				},
-				body: JSON.stringify(payload)
+				body: JSON.stringify(talentPayload)
 			});
 
-			if (!response.ok) {
-				const errorData = await response.text();
+			if (!talentResponse.ok) {
+				const errorData = await talentResponse.text();
 				throw new Error(errorData || 'Failed to create profile');
+			}
+
+			const newTalent = await talentResponse.json();
+
+			// Then, submit the application
+			const applicationPayload = {
+				talent_id: newTalent.id,
+				job_id: job.id,
+				resume_data: resumeData,
+				resume_filename: resumeFile?.name || null,
+				resume_content_type: resumeFile?.type || null,
+				cover_letter: coverLetter.trim() || null
+			};
+
+			const appResponse = await fetch('http://localhost:8080/api/v1/applications', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json'
+				},
+				body: JSON.stringify(applicationPayload)
+			});
+
+			if (!appResponse.ok) {
+				const errorData = await appResponse.text();
+				throw new Error(errorData || 'Failed to submit application');
 			}
 
 			step = 'success';
@@ -270,6 +365,54 @@
 						Use a different email
 					</button>
 				</p>
+
+				<Separator class="my-4" />
+
+				<!-- Resume Upload -->
+				<div class="space-y-2">
+					<Label for="resume-existing">Resume (Optional)</Label>
+					<input
+						id="resume-existing"
+						type="file"
+						accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+						class="hidden"
+						onchange={handleResumeSelect}
+					/>
+					{#if resumeFile}
+						<div class="flex items-center gap-2 rounded-md border p-2">
+							<FileText class="h-4 w-4 text-muted-foreground" />
+							<span class="flex-1 truncate text-sm">{resumeFile.name}</span>
+							<button
+								type="button"
+								class="rounded-full p-1 hover:bg-muted"
+								onclick={removeResume}
+							>
+								<X class="h-4 w-4" />
+							</button>
+						</div>
+					{:else}
+						<Button
+							variant="outline"
+							class="w-full"
+							onclick={() => document.getElementById('resume-existing')?.click()}
+						>
+							<Upload class="mr-2 h-4 w-4" />
+							Upload Resume
+						</Button>
+					{/if}
+					<p class="text-xs text-muted-foreground">PDF or Word document, max 5MB</p>
+				</div>
+
+				<!-- Cover Letter -->
+				<div class="space-y-2">
+					<Label for="cover-letter-existing">Cover Letter (Optional)</Label>
+					<Textarea
+						id="cover-letter-existing"
+						placeholder="Tell us why you're interested in this position..."
+						rows={3}
+						bind:value={coverLetter}
+					/>
+				</div>
 			</div>
 
 			<Dialog.Footer>
@@ -325,6 +468,54 @@
 				<div class="space-y-2">
 					<Label for="bio">Bio</Label>
 					<Textarea id="bio" placeholder="Tell us about yourself..." rows={3} bind:value={bio} />
+				</div>
+
+				<Separator />
+
+				<!-- Resume Upload -->
+				<div class="space-y-2">
+					<Label for="resume-new">Resume (Optional)</Label>
+					<input
+						id="resume-new"
+						type="file"
+						accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+						class="hidden"
+						onchange={handleResumeSelect}
+					/>
+					{#if resumeFile}
+						<div class="flex items-center gap-2 rounded-md border p-2">
+							<FileText class="h-4 w-4 text-muted-foreground" />
+							<span class="flex-1 truncate text-sm">{resumeFile.name}</span>
+							<button
+								type="button"
+								class="rounded-full p-1 hover:bg-muted"
+								onclick={removeResume}
+							>
+								<X class="h-4 w-4" />
+							</button>
+						</div>
+					{:else}
+						<Button
+							variant="outline"
+							class="w-full"
+							onclick={() => document.getElementById('resume-new')?.click()}
+						>
+							<Upload class="mr-2 h-4 w-4" />
+							Upload Resume
+						</Button>
+					{/if}
+					<p class="text-xs text-muted-foreground">PDF or Word document, max 5MB</p>
+				</div>
+
+				<!-- Cover Letter -->
+				<div class="space-y-2">
+					<Label for="cover-letter-new">Cover Letter (Optional)</Label>
+					<Textarea
+						id="cover-letter-new"
+						placeholder="Tell us why you're interested in this position..."
+						rows={3}
+						bind:value={coverLetter}
+					/>
 				</div>
 			</div>
 
