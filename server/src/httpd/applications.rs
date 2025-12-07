@@ -176,7 +176,7 @@ pub async fn get_application_resume(
                     Ok(bytes) => {
                         Ok(HttpResponse::Ok()
                             .content_type(content_type)
-                            .insert_header(("Content-Disposition", format!("attachment; filename=\"{}\"", filename)))
+                            .insert_header(("Content-Disposition", format!("inline; filename=\"{}\"", filename)))
                             .body(bytes))
                     }
                     Err(_) => Ok(HttpResponse::InternalServerError().json(ApiError {
