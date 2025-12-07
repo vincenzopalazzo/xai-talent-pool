@@ -1,0 +1,1 @@
+DELETE FROM talents WHERE id = ?;
