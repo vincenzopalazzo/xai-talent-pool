@@ -260,7 +260,7 @@
 </script>
 
 <Dialog.Root bind:open onOpenChange={(isOpen) => !isOpen && resetForm()}>
-	<Dialog.Content class="max-w-lg">
+	<Dialog.Content class="sm:max-w-[600px]">
 		<Dialog.Header>
 			<Dialog.Title>
 				{#if step === 'success'}
@@ -314,37 +314,37 @@
 				</Button>
 			</Dialog.Footer>
 		{:else if step === 'existing' && existingTalent}
-			<div class="space-y-4 py-4">
-				<div class="rounded-lg bg-muted/50 p-4">
-					<div class="flex items-start gap-4">
+			<div class="space-y-6 py-4">
+				<div class="rounded-lg border bg-card text-card-foreground shadow-sm">
+					<div class="p-6 flex items-start gap-4">
 						<div class="flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
 							<User class="h-6 w-6 text-primary" />
 						</div>
 						<div class="flex-1 space-y-1">
-							<p class="font-medium">{existingTalent.name}</p>
+							<p class="font-medium text-lg">{existingTalent.name}</p>
 							<p class="text-sm text-muted-foreground">{existingTalent.title}</p>
-							<div class="flex flex-wrap items-center gap-2 pt-1 text-xs text-muted-foreground">
-								<span class="flex items-center gap-1">
-									<Mail class="h-3 w-3" />
+							<div class="flex flex-wrap items-center gap-4 pt-2 text-sm text-muted-foreground">
+								<span class="flex items-center gap-1.5">
+									<Mail class="h-3.5 w-3.5" />
 									{existingTalent.email}
 								</span>
 								{#if existingTalent.location}
-									<span class="flex items-center gap-1">
-										<MapPin class="h-3 w-3" />
+									<span class="flex items-center gap-1.5">
+										<MapPin class="h-3.5 w-3.5" />
 										{existingTalent.location}
 									</span>
 								{/if}
-								<span class="flex items-center gap-1">
-									<Briefcase class="h-3 w-3" />
+								<span class="flex items-center gap-1.5">
+									<Briefcase class="h-3.5 w-3.5" />
 									{existingTalent.experience}
 								</span>
 							</div>
 						</div>
 					</div>
 					{#if existingTalentSkills().length > 0}
-						<div class="mt-3 flex flex-wrap gap-1">
+						<div class="px-6 pb-6 flex flex-wrap gap-1.5">
 							{#each existingTalentSkills().slice(0, 5) as skill}
-								<Badge variant="outline" class="text-xs">{skill}</Badge>
+								<Badge variant="secondary" class="text-xs">{skill}</Badge>
 							{/each}
 							{#if existingTalentSkills().length > 5}
 								<Badge variant="outline" class="text-xs">+{existingTalentSkills().length - 5}</Badge>
@@ -353,65 +353,83 @@
 					{/if}
 				</div>
 
-				<p class="text-sm text-muted-foreground">
-					Not you?{' '}
-					<button
-						class="text-primary hover:underline"
-						onclick={() => {
-							email = '';
-							step = 'email';
-						}}
-					>
-						Use a different email
-					</button>
-				</p>
-
-				<Separator class="my-4" />
-
-				<!-- Resume Upload -->
-				<div class="space-y-2">
-					<Label for="resume-existing">Resume (Optional)</Label>
-					<input
-						id="resume-existing"
-						type="file"
-						accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-						class="hidden"
-						onchange={handleResumeSelect}
-					/>
-					{#if resumeFile}
-						<div class="flex items-center gap-2 rounded-md border p-2">
-							<FileText class="h-4 w-4 text-muted-foreground" />
-							<span class="flex-1 truncate text-sm">{resumeFile.name}</span>
-							<button
-								type="button"
-								class="rounded-full p-1 hover:bg-muted"
-								onclick={removeResume}
-							>
-								<X class="h-4 w-4" />
-							</button>
-						</div>
-					{:else}
-						<Button
-							variant="outline"
-							class="w-full"
-							onclick={() => document.getElementById('resume-existing')?.click()}
+				<div class="flex justify-between items-center">
+					<p class="text-sm text-muted-foreground">
+						Not you?{' '}
+						<button
+							class="text-primary hover:underline font-medium"
+							onclick={() => {
+								email = '';
+								step = 'email';
+							}}
 						>
-							<Upload class="mr-2 h-4 w-4" />
-							Upload Resume
-						</Button>
-					{/if}
-					<p class="text-xs text-muted-foreground">PDF or Word document, max 5MB</p>
+							Use a different email
+						</button>
+					</p>
 				</div>
 
-				<!-- Cover Letter -->
-				<div class="space-y-2">
-					<Label for="cover-letter-existing">Cover Letter (Optional)</Label>
-					<Textarea
-						id="cover-letter-existing"
-						placeholder="Tell us why you're interested in this position..."
-						rows={3}
-						bind:value={coverLetter}
-					/>
+				<Separator />
+
+				<div class="space-y-4">
+					<h4 class="text-sm font-medium leading-none">Application Materials</h4>
+					
+					<!-- Resume Upload -->
+					<div class="space-y-2">
+						<Label for="resume-existing">Resume (Optional)</Label>
+						<input
+							id="resume-existing"
+							type="file"
+							accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+							class="hidden"
+							onchange={handleResumeSelect}
+						/>
+						{#if resumeFile}
+							<div class="flex items-center gap-3 rounded-md border bg-muted/40 p-3">
+								<div class="rounded-full bg-background p-2 border">
+									<FileText class="h-4 w-4 text-primary" />
+								</div>
+								<div class="flex-1 min-w-0">
+									<p class="text-sm font-medium truncate">{resumeFile.name}</p>
+									<p class="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
+								</div>
+								<button
+									type="button"
+									class="rounded-full p-1 hover:bg-background hover:text-destructive transition-colors"
+									onclick={removeResume}
+								>
+									<X class="h-4 w-4" />
+								</button>
+							</div>
+						{:else}
+							<div 
+								class="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer"
+								onclick={() => document.getElementById('resume-existing')?.click()}
+								onkeydown={(e) => e.key === 'Enter' && document.getElementById('resume-existing')?.click()}
+								role="button"
+								tabindex="0"
+							>
+								<div class="rounded-full bg-muted p-2">
+									<Upload class="h-5 w-5 text-muted-foreground" />
+								</div>
+								<div class="text-center">
+									<p class="text-sm font-medium">Click to upload resume</p>
+									<p class="text-xs text-muted-foreground">PDF or Word (max 5MB)</p>
+								</div>
+							</div>
+						{/if}
+					</div>
+
+					<!-- Cover Letter -->
+					<div class="space-y-2">
+						<Label for="cover-letter-existing">Cover Letter (Optional)</Label>
+						<Textarea
+							id="cover-letter-existing"
+							placeholder="Tell us why you're interested in this position..."
+							rows={4}
+							class="resize-none"
+							bind:value={coverLetter}
+						/>
+					</div>
 				</div>
 			</div>
 
@@ -427,99 +445,133 @@
 				</Button>
 			</Dialog.Footer>
 		{:else if step === 'new'}
-			<div class="max-h-[60vh] space-y-4 overflow-y-auto py-4">
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="name">Full Name *</Label>
-						<Input id="name" placeholder="John Doe" bind:value={name} />
-					</div>
-					<div class="space-y-2">
-						<Label for="handle">Handle *</Label>
-						<Input id="handle" placeholder="@johndoe" bind:value={handle} />
-					</div>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="title">Professional Title *</Label>
-					<Input id="title" placeholder="Senior Software Engineer" bind:value={title} />
-				</div>
-
-				<div class="grid gap-4 sm:grid-cols-2">
-					<div class="space-y-2">
-						<Label for="location">Location</Label>
-						<Input id="location" placeholder="San Francisco, CA" bind:value={location} />
-					</div>
-					<div class="space-y-2">
-						<Label for="experience">Experience Level *</Label>
-						<Input id="experience" placeholder="5+ years" bind:value={experience} />
-					</div>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="skills">Skills</Label>
-					<Input
-						id="skills"
-						placeholder="React, TypeScript, Node.js (comma-separated)"
-						bind:value={skills}
-					/>
-					<p class="text-xs text-muted-foreground">Enter skills separated by commas</p>
-				</div>
-
-				<div class="space-y-2">
-					<Label for="bio">Bio</Label>
-					<Textarea id="bio" placeholder="Tell us about yourself..." rows={3} bind:value={bio} />
-				</div>
-
-				<Separator />
-
-				<!-- Resume Upload -->
-				<div class="space-y-2">
-					<Label for="resume-new">Resume (Optional)</Label>
-					<input
-						id="resume-new"
-						type="file"
-						accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-						class="hidden"
-						onchange={handleResumeSelect}
-					/>
-					{#if resumeFile}
-						<div class="flex items-center gap-2 rounded-md border p-2">
-							<FileText class="h-4 w-4 text-muted-foreground" />
-							<span class="flex-1 truncate text-sm">{resumeFile.name}</span>
-							<button
-								type="button"
-								class="rounded-full p-1 hover:bg-muted"
-								onclick={removeResume}
-							>
-								<X class="h-4 w-4" />
-							</button>
+			<div class="max-h-[70vh] overflow-y-auto pr-2 -mr-2 py-2">
+				<div class="space-y-6">
+					<!-- Personal Info -->
+					<div class="space-y-4">
+						<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Personal Information</h4>
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div class="space-y-2">
+								<Label for="name">Full Name *</Label>
+								<Input id="name" placeholder="John Doe" bind:value={name} />
+							</div>
+							<div class="space-y-2">
+								<Label for="handle">Handle *</Label>
+								<div class="relative">
+									<span class="absolute left-3 top-2.5 text-muted-foreground">@</span>
+									<Input id="handle" class="pl-7" placeholder="johndoe" bind:value={handle} />
+								</div>
+							</div>
 						</div>
-					{:else}
-						<Button
-							variant="outline"
-							class="w-full"
-							onclick={() => document.getElementById('resume-new')?.click()}
-						>
-							<Upload class="mr-2 h-4 w-4" />
-							Upload Resume
-						</Button>
-					{/if}
-					<p class="text-xs text-muted-foreground">PDF or Word document, max 5MB</p>
-				</div>
+					</div>
 
-				<!-- Cover Letter -->
-				<div class="space-y-2">
-					<Label for="cover-letter-new">Cover Letter (Optional)</Label>
-					<Textarea
-						id="cover-letter-new"
-						placeholder="Tell us why you're interested in this position..."
-						rows={3}
-						bind:value={coverLetter}
-					/>
+					<Separator />
+
+					<!-- Professional Info -->
+					<div class="space-y-4">
+						<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Professional Details</h4>
+						<div class="space-y-2">
+							<Label for="title">Professional Title *</Label>
+							<Input id="title" placeholder="Senior Software Engineer" bind:value={title} />
+						</div>
+
+						<div class="grid gap-4 sm:grid-cols-2">
+							<div class="space-y-2">
+								<Label for="location">Location</Label>
+								<div class="relative">
+									<MapPin class="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+									<Input id="location" class="pl-9" placeholder="San Francisco, CA" bind:value={location} />
+								</div>
+							</div>
+							<div class="space-y-2">
+								<Label for="experience">Experience Level *</Label>
+								<Input id="experience" placeholder="e.g. 5+ years" bind:value={experience} />
+							</div>
+						</div>
+
+						<div class="space-y-2">
+							<Label for="skills">Skills</Label>
+							<Input
+								id="skills"
+								placeholder="React, TypeScript, Node.js (comma-separated)"
+								bind:value={skills}
+							/>
+						</div>
+
+						<div class="space-y-2">
+							<Label for="bio">Bio</Label>
+							<Textarea id="bio" placeholder="Tell us a bit about yourself..." rows={3} class="resize-none" bind:value={bio} />
+						</div>
+					</div>
+
+					<Separator />
+
+					<!-- Application Materials -->
+					<div class="space-y-4">
+						<h4 class="text-sm font-medium text-muted-foreground uppercase tracking-wider">Application Materials</h4>
+						
+						<!-- Resume Upload -->
+						<div class="space-y-2">
+							<Label for="resume-new">Resume (Optional)</Label>
+							<input
+								id="resume-new"
+								type="file"
+								accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+								class="hidden"
+								onchange={handleResumeSelect}
+							/>
+							{#if resumeFile}
+								<div class="flex items-center gap-3 rounded-md border bg-muted/40 p-3">
+									<div class="rounded-full bg-background p-2 border">
+										<FileText class="h-4 w-4 text-primary" />
+									</div>
+									<div class="flex-1 min-w-0">
+										<p class="text-sm font-medium truncate">{resumeFile.name}</p>
+										<p class="text-xs text-muted-foreground">{(resumeFile.size / 1024 / 1024).toFixed(2)} MB</p>
+									</div>
+									<button
+										type="button"
+										class="rounded-full p-1 hover:bg-background hover:text-destructive transition-colors"
+										onclick={removeResume}
+									>
+										<X class="h-4 w-4" />
+									</button>
+								</div>
+							{:else}
+								<div 
+									class="border-2 border-dashed rounded-lg p-6 flex flex-col items-center justify-center gap-2 hover:bg-muted/50 transition-colors cursor-pointer"
+									onclick={() => document.getElementById('resume-new')?.click()}
+									onkeydown={(e) => e.key === 'Enter' && document.getElementById('resume-new')?.click()}
+									role="button"
+									tabindex="0"
+								>
+									<div class="rounded-full bg-muted p-2">
+										<Upload class="h-5 w-5 text-muted-foreground" />
+									</div>
+									<div class="text-center">
+										<p class="text-sm font-medium">Click to upload resume</p>
+										<p class="text-xs text-muted-foreground">PDF or Word (max 5MB)</p>
+									</div>
+								</div>
+							{/if}
+						</div>
+
+						<!-- Cover Letter -->
+						<div class="space-y-2">
+							<Label for="cover-letter-new">Cover Letter (Optional)</Label>
+							<Textarea
+								id="cover-letter-new"
+								placeholder="Tell us why you're interested in this position..."
+								rows={4}
+								class="resize-none"
+								bind:value={coverLetter}
+							/>
+						</div>
+					</div>
 				</div>
 			</div>
 
-			<Dialog.Footer>
+			<Dialog.Footer class="mt-6">
 				<Button variant="outline" onclick={() => (step = 'email')}>Back</Button>
 				<Button onclick={createAndApply} disabled={isLoading}>
 					{#if isLoading}
@@ -531,19 +583,19 @@
 				</Button>
 			</Dialog.Footer>
 		{:else if step === 'success'}
-			<div class="flex flex-col items-center py-8 text-center">
-				<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900">
-					<CheckCircle2 class="h-8 w-8 text-green-600 dark:text-green-400" />
+			<div class="flex flex-col items-center py-12 text-center">
+				<div class="mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+					<CheckCircle2 class="h-10 w-10 text-green-600 dark:text-green-400" />
 				</div>
-				<h3 class="mb-2 text-lg font-medium">Application Submitted!</h3>
-				<p class="mb-4 text-sm text-muted-foreground">
-					Your application for <span class="font-medium">{job.title}</span> at{' '}
-					<span class="font-medium">{job.company_name}</span> has been submitted.
+				<h3 class="mb-2 text-2xl font-semibold tracking-tight">Application Submitted!</h3>
+				<p class="mb-8 text-muted-foreground max-w-xs mx-auto">
+					Your application for <span class="font-medium text-foreground">{job.title}</span> at{' '}
+					<span class="font-medium text-foreground">{job.company_name}</span> has been received.
 				</p>
 			</div>
 
 			<Dialog.Footer>
-				<Button class="w-full" onclick={() => (open = false)}>Done</Button>
+				<Button class="w-full sm:w-auto" onclick={() => (open = false)}>Return to Jobs</Button>
 			</Dialog.Footer>
 		{/if}
 	</Dialog.Content>

@@ -7,7 +7,7 @@ all: install dev
 install:
 	cd ui && npm install
 	cd server && cargo build
-	cd grok-service && uv pip install -e ".[dev]"
+	cd grok-service && uv venv && uv pip install -e ".[dev]"
 
 # Run the development server
 ui-dev:
@@ -67,7 +67,7 @@ dev-all:
 # Grok service commands
 # uv manages virtual environments and dependencies automatically
 grok-install:
-	cd grok-service && uv pip install -e ".[dev]"
+	cd grok-service && uv venv && uv pip install -e ".[dev]"
 
 grok-dev:
 	cd grok-service && uv run uvicorn grok_service.main:app --reload --host 0.0.0.0 --port 8001

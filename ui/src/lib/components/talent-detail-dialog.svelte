@@ -22,10 +22,11 @@
 		Twitter,
 		Trash2,
 		CheckSquare,
-		X
+		X,
+		Sparkles
 	} from 'lucide-svelte';
 	import PdfPreviewDialog from './pdf-preview-dialog.svelte';
-	import type { Talent, Application, Job, ExperienceSummary } from '$lib/types';
+	import type { Talent, Application, Job, ExperienceSummary, SocialMediaAnalysis } from '$lib/types';
 
 	let {
 		talent,
@@ -209,6 +210,16 @@
 		}
 	});
 
+	// Parse social analysis from JSON string
+	const socialAnalysis = $derived(() => {
+		if (!talent.social_analysis) return null;
+		try {
+			return JSON.parse(talent.social_analysis) as SocialMediaAnalysis;
+		} catch {
+			return null;
+		}
+	});
+
 	// Check if there are any social links
 	const hasSocialLinks = $derived(() => {
 		return talent.linkedin_url || talent.x_url || talent.github_url || talent.gitlab_url;
@@ -348,6 +359,62 @@
 										GitLab
 									</Button>
 								{/if}
+							</div>
+						</div>
+					{/if}
+
+					<!-- Social Analysis -->
+					{#if socialAnalysis()}
+						<div class="space-y-4 mt-6">
+							<h3 class="text-lg font-semibold flex items-center gap-2">
+								<Sparkles class="h-4 w-4 text-primary" />
+								AI Analysis
+							</h3>
+
+							{#if socialAnalysis()?.tldr}
+								<div class="rounded-lg bg-muted/50 p-4 text-sm text-muted-foreground">
+									{socialAnalysis()?.tldr}
+								</div>
+							{/if}
+
+							<div class="space-y-4">
+								{#each socialAnalysis()?.profiles || [] as profile}
+									<div class="rounded-lg border p-4">
+										<div class="flex items-center justify-between mb-2">
+											<div class="flex items-center gap-2">
+												<span class="font-medium">{profile.platform}</span>
+												{#if profile.verified}
+													<Badge variant="secondary" class="h-5 px-1.5 text-xs">Verified</Badge>
+												{/if}
+											</div>
+											{#if profile.url}
+												<a
+													href={profile.url}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="text-xs text-muted-foreground hover:underline flex items-center gap-1"
+												>
+													View <ExternalLink class="h-3 w-3" />
+												</a>
+											{/if}
+										</div>
+
+										{#if profile.tldr}
+											<p class="text-sm text-muted-foreground mb-3">{profile.tldr}</p>
+										{/if}
+
+										{#if profile.highlights && profile.highlights.length > 0}
+											<div class="space-y-1">
+												<p class="text-xs font-medium text-muted-foreground">Highlights</p>
+												<ul class="list-disc list-inside text-sm text-muted-foreground pl-1">
+													{#each profile.highlights.slice(0, 3) as highlight}
+														<li>{highlight}</li>
+													{/each}
+												</ul>
+											</div>
+										{/if}
+									</div>
+								{/each}
 							</div>
 						</div>
 					{/if}

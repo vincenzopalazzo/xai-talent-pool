@@ -6,7 +6,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from xai_sdk import Client
 
-from grok_service.config import settings
+from grok_service.config import get_settings
 from grok_service.services.ranking import GRPORankingService
 
 logger = logging.getLogger(__name__)
@@ -53,6 +53,7 @@ class RankingStatsResponse(BaseModel):
 # Dependency: Get ranking service
 def get_ranking_service() -> GRPORankingService:
     """Create and return a GRPO ranking service instance."""
+    settings = get_settings()
     xai_client = Client(api_key=settings.xai_api_key)
     return GRPORankingService(xai_client)
 

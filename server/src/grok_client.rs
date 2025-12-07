@@ -89,6 +89,35 @@ pub struct DocumentResponse {
     pub error: Option<String>,
 }
 
+/// Social media input URLs
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialMediaInput {
+    pub linkedin: Option<String>,
+    pub x: Option<String>,
+    pub github: Option<String>,
+    pub gitlab: Option<String>,
+    pub stackoverflow: Option<String>,
+}
+
+/// Request for social media analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialMediaAnalysisRequest {
+    pub talent_id: String,
+    pub collection_id: Option<String>,
+    pub name: String,
+    pub email: Option<String>,
+    pub social_urls: SocialMediaInput,
+    pub platforms_to_search: Vec<String>,
+}
+
+/// Response for social media analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SocialMediaAnalysisResponse {
+    pub success: bool,
+    pub result: Option<serde_json::Value>,
+    pub error: Option<String>,
+}
+
 /// Grok service client
 pub struct GrokClient {
     base_url: String,
@@ -302,6 +331,55 @@ impl GrokClient {
         if let Some(ref doc) = parsed.document {
             info!("[GrokClient] New document ID: {}", doc.document_id);
         }
+
+        Ok(parsed)
+    }
+
+    /// Analyze social media profiles
+    pub async fn analyze_social_media(
+        &self,
+        request: &SocialMediaAnalysisRequest,
+    ) -> Result<SocialMediaAnalysisResponse, String> {
+        info!("[GrokClient] Analyzing social media for talent: {}", request.talent_id);
+
+        let url = format!("{}/api/v1/social/analyze", self.base_url);
+        info!("[GrokClient] Sending POST to: {}", url);
+
+        let response = self
+            .client
+            .post(&url)
+            .json(request)
+            .send()
+            .await
+            .map_err(|e| {
+                error!("[GrokClient] Social media analysis request failed: {}", e);
+                format!("Failed to send request to Grok service: {}", e)
+            })?;
+
+        let status = response.status();
+        info!("[GrokClient] Social media analysis response status: {}", status);
+
+        if !status.is_success() {
+            let body = response.text().await.unwrap_or_default();
+            error!("[GrokClient] Social media analysis error response: {}", body);
+            return Err(format!(
+                "Grok service returned error {}: {}",
+                status, body
+            ));
+        }
+
+        let response_text = response.text().await
+            .map_err(|e| format!("Failed to read response body: {}", e))?;
+
+        // info!("[GrokClient] Social media analysis response: {}", response_text);
+
+        let parsed: SocialMediaAnalysisResponse = serde_json::from_str(&response_text)
+            .map_err(|e| {
+                error!("[GrokClient] Social media analysis JSON parse error: {}", e);
+                format!("Failed to parse response: {}", e)
+            })?;
+
+        info!("[GrokClient] Social media analysis - success: {}", parsed.success);
 
         Ok(parsed)
     }

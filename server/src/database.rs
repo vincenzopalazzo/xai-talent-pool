@@ -39,6 +39,12 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
         let _ = sqlx::query(statement).execute(&pool).await;
     }
 
+    // Add social analysis fields (ignore error if column already exists)
+    let social_analysis_schema = include_str!("../migrations/007_add_talent_social_analysis.sql");
+    for statement in social_analysis_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
     // Create reorder tracking tables
     let reorder_schema = include_str!("../migrations/008_create_reorder_tables.sql");
     for statement in reorder_schema.split(';').filter(|s| !s.trim().is_empty()) {
@@ -330,6 +336,28 @@ pub async fn update_talent_resume_fields(
         .bind(&talent_id)
         .fetch_optional(pool)
         .await
+}
+
+/// Update talent's social analysis
+pub async fn update_talent_social_analysis(
+    pool: &Pool,
+    id: String,
+    social_analysis: Option<String>,
+    x_handle: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        r#"
+        UPDATE talents
+        SET social_analysis = ?, x_handle_discovered = ?
+        WHERE id = ?
+        RETURNING *
+        "#,
+    )
+    .bind(social_analysis)
+    .bind(x_handle)
+    .bind(id)
+    .fetch_optional(pool)
+    .await
 }
 
 // Reorder tracking functions

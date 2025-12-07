@@ -5,7 +5,7 @@ use chrono::Utc;
 use log::{info, error, warn};
 
 use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError, BulkDeleteRequest, BulkDeleteResponse};
-use crate::grok_client::{GrokClient, TalentInfo};
+use crate::grok_client::{GrokClient, TalentInfo, SocialMediaAnalysisRequest, SocialMediaInput, ProfileUrls};
 use super::server::AppState;
 
 #[api_v2_operation]
@@ -91,6 +91,7 @@ pub async fn create_application(
                 info!("Resume filename: {}", filename);
                 info!("PDF size: {} bytes", pdf_bytes.len());
 
+                let mut extracted_urls: Option<ProfileUrls> = None;
                 let client = GrokClient::new(&grok_url);
 
                 match client.analyze_resume(&talent_info, &pdf_bytes, &filename).await {
@@ -121,6 +122,8 @@ pub async fn create_application(
                                 info!("  GitHub: {}", result.urls.github.as_deref().unwrap_or("Not found"));
                                 info!("  GitLab: {}", result.urls.gitlab.as_deref().unwrap_or("Not found"));
                                 info!("======================================================================");
+
+                                extracted_urls = Some(result.urls.clone());
 
                                 // Serialize experiences to JSON
                                 let experiences_json = serde_json::to_string(&result.experiences)
@@ -250,6 +253,56 @@ pub async fn create_application(
                             error!("======================================================================");
                             error!("DOCUMENT UPLOAD ERROR: {}", e);
                             error!("======================================================================");
+                        }
+                    }
+
+                    // Analyze social media if we have URLs
+                    if let Some(urls) = extracted_urls {
+                        info!("======================================================================");
+                        info!("SOCIAL MEDIA ANALYSIS: Starting");
+                        info!("======================================================================");
+                        
+                        let social_request = SocialMediaAnalysisRequest {
+                            talent_id: talent_id.clone(),
+                            collection_id: Some(coll_id.clone()),
+                            name: talent_name.clone(),
+                            email: Some(talent_info.email.clone()),
+                            social_urls: SocialMediaInput {
+                                linkedin: urls.linkedin,
+                                x: urls.x,
+                                github: urls.github,
+                                gitlab: urls.gitlab,
+                                stackoverflow: None,
+                            },
+                            platforms_to_search: vec!["X".to_string(), "GitHub".to_string(), "LinkedIn".to_string()],
+                        };
+                        
+                        match client.analyze_social_media(&social_request).await {
+                            Ok(response) => {
+                                if response.success {
+                                    info!("SOCIAL MEDIA ANALYSIS: Success!");
+                                    if let Some(result) = response.result {
+                                        // Update talent with social analysis
+                                        let analysis_json = serde_json::to_string(&result).ok();
+                                        
+                                        // We need to extract x_handle if present
+                                        let x_handle = result.get("x_handle").and_then(|v| v.as_str()).map(|s| s.to_string());
+                                        
+                                        match crate::database::update_talent_social_analysis(
+                                            &pool_clone,
+                                            talent_id.clone(),
+                                            analysis_json,
+                                            x_handle,
+                                        ).await {
+                                            Ok(_) => info!("SUCCESS: Updated talent {} with social analysis", talent_id),
+                                            Err(e) => error!("FAILED to update talent {} with social analysis: {}", talent_id, e),
+                                        }
+                                    }
+                                } else {
+                                    error!("SOCIAL MEDIA ANALYSIS: Failed - {:?}", response.error);
+                                }
+                            }
+                            Err(e) => error!("SOCIAL MEDIA ANALYSIS ERROR: {}", e),
                         }
                     }
                 } else {
