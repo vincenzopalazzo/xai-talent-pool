@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { page } from '$app/stores';
-	import { Home, Users, Settings, Menu, Briefcase, Star } from 'lucide-svelte';
+	import { Home, Users, Settings, Menu, Briefcase, Star, ClipboardList } from 'lucide-svelte';
 	import { Button } from '$lib/components/ui/button';
 	import { Separator } from '$lib/components/ui/separator';
 
@@ -10,6 +10,7 @@
 		{ icon: Home, label: 'Dashboard', href: '/dashboard' },
 		{ icon: Users, label: 'Talent Pool', href: '/' },
 		{ icon: Briefcase, label: 'Jobs', href: '/jobs' },
+		{ icon: ClipboardList, label: 'Requirements', href: '/requirements' },
 		{ icon: Star, label: 'Saved', href: '/saved' },
 		{ icon: Settings, label: 'Settings', href: '/settings' }
 	];

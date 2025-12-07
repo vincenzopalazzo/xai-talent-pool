@@ -1,5 +1,5 @@
 use sqlx::SqlitePool;
-use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application};
+use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application, HiringRequirement, UpdateHiringRequirementRequest};
 
 pub type Pool = SqlitePool;
 
@@ -36,6 +36,12 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
     // Add resume_document_id field (ignore error if column already exists)
     let resume_doc_schema = include_str!("../migrations/006_add_talent_resume_document_id.sql");
     for statement in resume_doc_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
+    // Create hiring_requirements table
+    let hiring_req_schema = include_str!("../migrations/007_create_hiring_requirements_table.sql");
+    for statement in hiring_req_schema.split(';').filter(|s| !s.trim().is_empty()) {
         let _ = sqlx::query(statement).execute(&pool).await;
     }
 
@@ -281,4 +287,84 @@ pub async fn update_talent_resume_fields(
         .bind(&talent_id)
         .fetch_optional(pool)
         .await
+}
+
+// Hiring Requirements database functions
+
+pub async fn create_hiring_requirement(pool: &Pool, requirement: &HiringRequirement) -> Result<HiringRequirement, sqlx::Error> {
+    sqlx::query_as::<_, HiringRequirement>(
+        "INSERT INTO hiring_requirements (id, job_id, title, company_name, requirements_text, created_at)
+         VALUES (?, ?, ?, ?, ?, ?)
+         RETURNING *"
+    )
+        .bind(&requirement.id)
+        .bind(&requirement.job_id)
+        .bind(&requirement.title)
+        .bind(&requirement.company_name)
+        .bind(&requirement.requirements_text)
+        .bind(&requirement.created_at)
+        .fetch_one(pool)
+        .await
+}
+
+pub async fn get_all_hiring_requirements(pool: &Pool) -> Result<Vec<HiringRequirement>, sqlx::Error> {
+    sqlx::query_as::<_, HiringRequirement>(
+        "SELECT * FROM hiring_requirements ORDER BY created_at DESC"
+    )
+        .fetch_all(pool)
+        .await
+}
+
+pub async fn get_hiring_requirement_by_id(pool: &Pool, id: String) -> Result<Option<HiringRequirement>, sqlx::Error> {
+    sqlx::query_as::<_, HiringRequirement>(
+        "SELECT * FROM hiring_requirements WHERE id = ?"
+    )
+        .bind(&id)
+        .fetch_optional(pool)
+        .await
+}
+
+pub async fn get_hiring_requirements_by_job(pool: &Pool, job_id: String) -> Result<Vec<HiringRequirement>, sqlx::Error> {
+    sqlx::query_as::<_, HiringRequirement>(
+        "SELECT * FROM hiring_requirements WHERE job_id = ? ORDER BY created_at DESC"
+    )
+        .bind(&job_id)
+        .fetch_all(pool)
+        .await
+}
+
+pub async fn update_hiring_requirement(
+    pool: &Pool,
+    id: String,
+    updates: &UpdateHiringRequirementRequest,
+) -> Result<Option<HiringRequirement>, sqlx::Error> {
+    let title = updates.title.as_ref().map(|s| s as &str).unwrap_or("");
+    let company_name = updates.company_name.as_ref().map(|s| s as &str).unwrap_or("");
+    let requirements_text = updates.requirements_text.as_ref().map(|s| s as &str).unwrap_or("");
+
+    sqlx::query_as::<_, HiringRequirement>(
+        "UPDATE hiring_requirements SET
+            job_id = COALESCE(?, job_id),
+            title = CASE WHEN ?1 = '' THEN title ELSE ?1 END,
+            company_name = CASE WHEN ?2 = '' THEN company_name ELSE ?2 END,
+            requirements_text = CASE WHEN ?3 = '' THEN requirements_text ELSE ?3 END
+         WHERE id = ?4
+         RETURNING *"
+    )
+        .bind(&updates.job_id)
+        .bind(title)
+        .bind(company_name)
+        .bind(requirements_text)
+        .bind(&id)
+        .fetch_optional(pool)
+        .await
+}
+
+pub async fn delete_hiring_requirement(pool: &Pool, id: String) -> Result<bool, sqlx::Error> {
+    let rows = sqlx::query("DELETE FROM hiring_requirements WHERE id = ?")
+        .bind(&id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    Ok(rows > 0)
 }

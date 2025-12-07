@@ -155,3 +155,31 @@ pub struct ApplicationResponse {
     pub status: String,
     pub created_at: String,
 }
+
+// Hiring Requirements models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]
+pub struct HiringRequirement {
+    pub id: String,
+    pub job_id: Option<String>,
+    pub title: String,
+    pub company_name: String,
+    pub requirements_text: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct CreateHiringRequirementRequest {
+    pub job_id: Option<String>,
+    pub title: String,
+    pub company_name: String,
+    pub requirements_text: String,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct UpdateHiringRequirementRequest {
+    pub job_id: Option<String>,
+    pub title: Option<String>,
+    pub company_name: Option<String>,
+    pub requirements_text: Option<String>,
+}
