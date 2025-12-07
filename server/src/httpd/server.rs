@@ -5,7 +5,9 @@ use log::info;
 
 use super::talents::{
     get_talents, create_talent, get_talent, update_talent, delete_talent,
-    // add more if needed
+};
+use super::jobs::{
+    get_jobs, create_job, get_job, update_job, delete_job,
 };
 
 #[derive(Clone)]
@@ -82,11 +84,18 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str) -> 
             .wrap_api()
             .with_json_spec_at("/api/v1")
             .service(swagger_ui)
+            // Talent routes
             .service(get_talents)
             .service(create_talent)
             .service(get_talent)
             .service(update_talent)
             .service(delete_talent)
+            // Job routes
+            .service(get_jobs)
+            .service(create_job)
+            .service(get_job)
+            .service(update_job)
+            .service(delete_job)
             .build()
     })
     .bind(&bind_address)?
