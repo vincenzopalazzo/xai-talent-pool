@@ -10,9 +10,13 @@
 		Mail,
 		Calendar,
 		ExternalLink,
-		CheckCircle2
+		CheckCircle2,
+		FileText,
+		Download,
+		Loader2,
+		Building2
 	} from 'lucide-svelte';
-	import type { Talent } from '$lib/types';
+	import type { Talent, Application, Job } from '$lib/types';
 
 	let {
 		talent,
@@ -21,6 +25,56 @@
 		talent: Talent;
 		open: boolean;
 	} = $props();
+
+	// Applications state
+	interface ApplicationWithJob extends Application {
+		job?: Job;
+	}
+	let applications = $state<ApplicationWithJob[]>([]);
+	let isLoadingApplications = $state(false);
+
+	// Fetch applications when dialog opens
+	$effect(() => {
+		if (open && talent.id) {
+			fetchApplications();
+		}
+	});
+
+	async function fetchApplications() {
+		isLoadingApplications = true;
+		try {
+			const response = await fetch(`http://localhost:8080/api/v1/applications/talent/${talent.id}`);
+			if (response.ok) {
+				const apps: Application[] = await response.json();
+
+				// Fetch job info for each application
+				const appsWithJobs = await Promise.all(
+					apps.map(async (app) => {
+						try {
+							const jobResponse = await fetch(`http://localhost:8080/api/v1/jobs/${app.job_id}`);
+							if (jobResponse.ok) {
+								const job = await jobResponse.json();
+								return { ...app, job };
+							}
+						} catch {
+							// Job fetch failed, continue without it
+						}
+						return app;
+					})
+				);
+
+				applications = appsWithJobs;
+			}
+		} catch {
+			// Failed to fetch applications
+		} finally {
+			isLoadingApplications = false;
+		}
+	}
+
+	function downloadResume(applicationId: string) {
+		window.open(`http://localhost:8080/api/v1/applications/${applicationId}/resume`, '_blank');
+	}
 
 	// Parse skills from comma-separated string or array
 	const skills = $derived(() => {
@@ -37,6 +91,20 @@
 			month: 'long',
 			day: 'numeric'
 		});
+	};
+
+	// Status badge variant
+	const getStatusVariant = (status: string) => {
+		switch (status.toLowerCase()) {
+			case 'accepted':
+				return 'default';
+			case 'rejected':
+				return 'destructive';
+			case 'reviewed':
+				return 'secondary';
+			default:
+				return 'outline';
+		}
 	};
 </script>
 
@@ -116,6 +184,62 @@
 					</div>
 				</div>
 			{/if}
+
+			<Separator />
+
+			<!-- Applications -->
+			<div class="space-y-3">
+				<h3 class="text-sm font-semibold">Job Applications</h3>
+				{#if isLoadingApplications}
+					<div class="flex items-center justify-center py-4">
+						<Loader2 class="h-5 w-5 animate-spin text-muted-foreground" />
+					</div>
+				{:else if applications.length === 0}
+					<p class="text-sm text-muted-foreground">No applications yet</p>
+				{:else}
+					<div class="space-y-3">
+						{#each applications as app (app.id)}
+							<div class="rounded-lg border p-3">
+								<div class="flex items-start justify-between gap-3">
+									<div class="flex-1 space-y-1">
+										<div class="flex items-center gap-2">
+											<Building2 class="h-4 w-4 text-muted-foreground" />
+											<span class="font-medium text-sm">
+												{app.job?.title || 'Unknown Position'}
+											</span>
+											<Badge variant={getStatusVariant(app.status)} class="capitalize text-xs">
+												{app.status}
+											</Badge>
+										</div>
+										{#if app.job?.company_name}
+											<p class="text-xs text-muted-foreground">{app.job.company_name}</p>
+										{/if}
+										<p class="text-xs text-muted-foreground">
+											Applied {formatDate(app.created_at)}
+										</p>
+									</div>
+									{#if app.has_resume}
+										<Button
+											variant="outline"
+											size="sm"
+											onclick={() => downloadResume(app.id)}
+										>
+											<Download class="mr-1 h-3 w-3" />
+											Resume
+										</Button>
+									{/if}
+								</div>
+								{#if app.has_resume && app.resume_filename}
+									<div class="mt-2 flex items-center gap-1 text-xs text-muted-foreground">
+										<FileText class="h-3 w-3" />
+										<span>{app.resume_filename}</span>
+									</div>
+								{/if}
+							</div>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
 
 		<Dialog.Footer class="flex-col gap-2 sm:flex-row">
