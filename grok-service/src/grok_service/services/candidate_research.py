@@ -23,38 +23,87 @@ class Platform(str, Enum):
     STACKOVERFLOW = "stackoverflow"
 
 
-# Platform-specific focus areas
+# Platform-specific focus areas optimized for AI/ML talent recruiting
 PLATFORM_FOCUS = {
-    Platform.GITHUB: (
-        "technical projects, repositories, code contributions, "
-        "programming languages, and open-source activity"
-    ),
-    Platform.LINKEDIN: (
-        "professional experience, job history, education, "
-        "skills, endorsements, and recommendations"
-    ),
-    Platform.TWITTER: (
-        "professional tweets, thought leadership, "
-        "industry engagement, and online presence"
-    ),
-    Platform.STACKOVERFLOW: (
-        "technical questions answered, reputation score, "
-        "areas of expertise, and community contributions"
-    ),
+    Platform.GITHUB: {
+        "focus": (
+            "repositories, code contributions, programming languages, "
+            "open-source activity, and collaboration patterns"
+        ),
+        "signals": [
+            "AI/ML projects (PyTorch, TensorFlow, JAX, transformers)",
+            "Systems programming (Rust, C++, CUDA)",
+            "Code quality and documentation practices",
+            "Contribution frequency and consistency",
+            "Collaboration style (PRs, code reviews, issues)",
+            "Project complexity and scale",
+        ],
+    },
+    Platform.LINKEDIN: {
+        "focus": (
+            "career trajectory, company caliber, role progression, "
+            "education, and professional network"
+        ),
+        "signals": [
+            "Tenure patterns (job-hopping vs stability)",
+            "Company tier (FAANG, top startups, research labs)",
+            "Role progression (IC track vs management)",
+            "Education (top CS programs, PhD research)",
+            "Publications or patents",
+            "Leadership and team size managed",
+        ],
+    },
+    Platform.TWITTER: {
+        "focus": (
+            "technical discussions, AI community engagement, "
+            "thought leadership, and professional tone"
+        ),
+        "signals": [
+            "AI/ML technical discussions and insights",
+            "Engagement with AI research papers",
+            "Interactions with xAI, OpenAI, Anthropic content",
+            "Professional vs personal tone balance",
+            "Community reputation and follower quality",
+            "Original technical content vs retweets",
+        ],
+    },
+    Platform.STACKOVERFLOW: {
+        "focus": (
+            "technical expertise depth, problem-solving ability, "
+            "and community standing"
+        ),
+        "signals": [
+            "Reputation score and badges",
+            "Top tags (ML, deep-learning, python, etc.)",
+            "Answer quality and acceptance rate",
+            "Question complexity handled",
+            "Teaching ability in explanations",
+            "Breadth vs depth of expertise",
+        ],
+    },
 }
 
-SYSTEM_PROMPT = (
-    "You are an evidence-first recruiter research assistant with search tools. "
-    "Use web_search for web platforms (GitHub, LinkedIn, etc.) "
-    "and x_search for X/Twitter. "
-    "Always search for the specific profile URL if provided. "
-    "Only provide verifiable facts from publicly available information. "
-    "Do NOT guess, infer private details, or fill gaps with assumptions. "
-    "If unconfirmed, write 'Unknown' or 'Not publicly indicated'. "
-    "Be concise and professional. Use bullet points. "
-    "Include source URLs from your search results. "
-    "Do not add motivational language, filler, or generic advice."
-)
+SYSTEM_PROMPT = """You are an AI talent researcher for xAI's recruiting team.
+Your job is to help recruiters evaluate candidates for AI/ML engineering roles.
+
+TOOLS:
+- Use web_search for GitHub, LinkedIn, StackOverflow profiles
+- Use x_search for X/Twitter profiles and posts
+
+EVALUATION LENS (xAI context):
+- Technical depth in AI/ML, systems programming, or infrastructure
+- Evidence of building and shipping at scale
+- Clear technical communication
+- Collaborative work style
+- Intellectual curiosity and continuous learning
+
+RULES:
+- Only report verifiable facts from search results
+- Include source URLs for all claims
+- Write "Unknown" if information cannot be confirmed
+- Be direct and concise - recruiters are busy
+- No speculation, no filler, no generic advice
+- Highlight both strengths AND concerns objectively"""
 
 
 class IdentityMatch(BaseModel):
@@ -122,97 +171,69 @@ def _build_research_prompt(
     elif platform == Platform.TWITTER:
         platform_name = "Twitter/X"
 
-    focus = PLATFORM_FOCUS[platform]
+    platform_config = PLATFORM_FOCUS[platform]
+    focus = platform_config["focus"]
+    signals = "\n".join(f"  - {s}" for s in platform_config["signals"])
 
-    # Build email hint if provided
-    email_hint = ""
-    if email:
-        email_hint = f"""
-Email hint: {email}
-(Use the email domain to help verify employer/organization affiliation)
-"""
-
-    # Build profile URL hint if provided - this is the key improvement
-    profile_hint = ""
+    # Build context hints
+    context_hints = []
     if profile_url:
-        profile_hint = f"""
-IMPORTANT - Direct Profile URL: {profile_url}
-Use web_search to browse this specific URL and extract information.
-Do NOT search for other profiles with similar names - focus on this exact profile.
-"""
+        context_hints.append(f"PROFILE URL: {profile_url}")
+        context_hints.append("Search this exact URL first.")
+    if email:
+        domain = email.split("@")[-1] if "@" in email else ""
+        context_hints.append(f"EMAIL: {email}")
+        if domain:
+            context_hints.append(f"(Domain '{domain}' may indicate employer)")
 
-    # Determine which tool to use based on platform
-    tool_instruction = ""
+    context_block = "\n".join(context_hints) if context_hints else ""
+
+    # Tool instruction based on platform
     if platform == Platform.TWITTER:
-        tool_instruction = (
-            "Use x_search to search for this person's X/Twitter posts and profile. "
-            "Use web_search for additional context if needed."
-        )
+        tool_hint = "Use x_search to find posts and profile. Use web_search too."
     else:
-        tool_instruction = (
-            f"Use web_search to find this person's {platform_name} profile "
-            "and professional presence."
-        )
+        tool_hint = f"Use web_search to find their {platform_name} profile."
 
-    return f"""
-You are generating a {platform_name}-specific recruiting research note for:
-{person_name}.
-{email_hint}{profile_hint}
-SEARCH INSTRUCTION: {tool_instruction}
+    return f"""Research {person_name} on {platform_name} for xAI recruiting.
 
-Rules:
-- Output MUST be factual and concise.
-- Do NOT speculate.
-- Do NOT include generic coaching or platform tips unless explicitly asked.
-- If you cannot verify something from public info, write: Unknown.
-- Prefer short bullet points over paragraphs.
-- Do not repeat the instructions.
-- Do not use marketing language.
+{context_block}
 
-Focus scope for {platform_name}:
+SEARCH: {tool_hint}
+
+WHAT TO LOOK FOR on {platform_name}:
 {focus}
 
-Write the report in Markdown using this exact structure:
+KEY SIGNALS TO EVALUATE:
+{signals}
+
+OUTPUT FORMAT (Markdown):
 
 ## TLDR
-(One sentence summary of this person's {platform_name} presence for recruiters)
+One sentence: [Strength level: Strong/Moderate/Weak/Unknown] - [Key finding]
 
-## Identity Match
-- Primary likely profile(s):
-  - Name:
-  - Handle/URL:
-  - Location (if explicitly listed):
-  - Current role (if explicitly listed):
-- Disambiguation notes (only if needed):
+## Profile Match
+- Name:
+- URL/Handle:
+- Location:
+- Current Role:
+- Confidence: [High/Medium/Low] (explain if ambiguous)
 
-## Evidence-Based Highlights
--
+## Technical Signals
+- [List specific technical evidence found]
 
-## Professional Experience (publicly stated)
--
+## Experience & Impact
+- [Career level, company caliber, scope of work]
 
-## Skills & Technical/Domain Signals
--
+## Strengths (for xAI)
+- [Top 3 strengths relevant to AI/ML roles]
 
-## Notable Work / Content / Contributions
--
+## Concerns
+- [Any red flags or gaps - write "None identified" if clean]
 
-## Signals of Seniority / Impact
--
+## Recruiter Action Items
+- [2-3 specific things to verify or discuss in interview]
 
-## Red Flags (public, professional)
-- Only include if clearly evidenced in public professional context.
-- Otherwise write: Unknown.
-
-## Recruiter Takeaways (factual synthesis)
-- 3-6 bullets that summarize only what is supported above.
-
-## Open Questions
-- 3-6 bullets phrased as questions for a human recruiter to verify.
-
-If no reliable public information is found for {platform_name}, output:
-- "Unknown" under each section and keep the headings.
-"""
+If profile not found, write "Profile not found on {platform_name}" and skip sections."""
 
 
 def _extract_tldr(content: str) -> str:
@@ -350,7 +371,7 @@ class CandidateResearchService:
                 "name": (
                     p.value.title() if p != Platform.STACKOVERFLOW else "Stack Overflow"
                 ),
-                "focus": PLATFORM_FOCUS[p],
+                "focus": PLATFORM_FOCUS[p]["focus"],
             }
             for p in Platform
         ]
