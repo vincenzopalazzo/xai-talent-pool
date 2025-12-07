@@ -232,6 +232,15 @@ pub async fn get_applications_by_job(pool: &Pool, job_id: String) -> Result<Vec<
         .await
 }
 
+pub async fn delete_application(pool: &Pool, id: String) -> Result<bool, sqlx::Error> {
+    let rows = sqlx::query(include_str!("queries/delete_application.sql"))
+        .bind(&id)
+        .execute(pool)
+        .await?
+        .rows_affected();
+    Ok(rows > 0)
+}
+
 /// Update talent's resume_document_id
 pub async fn update_talent_resume_document_id(
     pool: &Pool,
