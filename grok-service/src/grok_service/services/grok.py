@@ -80,7 +80,7 @@ class GrokService:
             ResumeAnalysis with experiences and URLs
         """
         chat = self.client.chat.create(
-            model="grok-3",
+            model="grok-4-1-fast-non-reasoning",
             messages=[system(SYSTEM_PROMPT)],
         )
 

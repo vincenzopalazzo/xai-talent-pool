@@ -2,8 +2,10 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use paperclip::actix::api_v2_operation;
 use uuid::Uuid;
 use chrono::Utc;
+use log::{info, error};
 
 use crate::models::{Talent, CreateTalentRequest, UpdateTalentRequest, ApiError};
+use crate::grok_client::GrokClient;
 use super::server::AppState;
 
 #[api_v2_operation]
@@ -41,9 +43,62 @@ async fn create_talent(
         x_url: None,
         github_url: None,
         gitlab_url: None,
+        collection_id: None,
+        resume_document_id: None,
     };
     let inserted = crate::database::create_talent(&pool, &new_talent).await
         .map_err(actix_web::error::ErrorInternalServerError)?;
+
+    // Create a collection for this talent asynchronously
+    let grok_url = data.grok_service_url.clone();
+    let pool_clone = pool.clone();
+    let talent_id = inserted.id.clone();
+    let talent_name = inserted.name.clone();
+
+    tokio::spawn(async move {
+        info!("======================================================================");
+        info!("COLLECTION CREATION: Starting for talent {}", talent_id);
+        info!("======================================================================");
+
+        let client = GrokClient::new(&grok_url);
+
+        match client.create_collection(&talent_id, &talent_name).await {
+            Ok(response) => {
+                if response.success {
+                    if let Some(collection) = response.collection {
+                        info!("======================================================================");
+                        info!("COLLECTION CREATION: Success!");
+                        info!("Talent ID: {}", talent_id);
+                        info!("Collection ID: {}", collection.collection_id);
+                        info!("Collection Name: {}", collection.collection_name);
+                        info!("======================================================================");
+
+                        // Update talent with collection_id
+                        match crate::database::update_talent_collection_id(
+                            &pool_clone,
+                            talent_id.clone(),
+                            collection.collection_id.clone(),
+                        ).await {
+                            Ok(_) => {
+                                info!("SUCCESS: Updated talent {} with collection_id {}", talent_id, collection.collection_id);
+                            },
+                            Err(e) => {
+                                error!("FAILED to update talent {} with collection_id: {}", talent_id, e);
+                            }
+                        }
+                    }
+                } else {
+                    error!("COLLECTION CREATION: Failed - {:?}", response.error);
+                }
+            }
+            Err(e) => {
+                error!("======================================================================");
+                error!("COLLECTION CREATION: Error - {}", e);
+                error!("======================================================================");
+            }
+        }
+    });
+
     Ok(HttpResponse::Created().json(inserted))
 }
 

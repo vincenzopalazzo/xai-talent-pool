@@ -55,3 +55,56 @@ class ScreeningResponse(BaseModel):
     success: bool = Field(..., description="Whether the screening was successful")
     result: ScreeningResult | None = Field(None, description="Screening result")
     error: str | None = Field(None, description="Error message if failed")
+
+
+# Collection models
+
+
+class CreateCollectionRequest(BaseModel):
+    """Request to create a collection for a talent."""
+
+    talent_id: str = Field(..., description="Unique talent identifier")
+    talent_name: str = Field(..., description="Talent name for collection naming")
+
+
+class CollectionInfo(BaseModel):
+    """Collection information."""
+
+    collection_id: str = Field(..., description="The xAI collection ID")
+    collection_name: str = Field(..., description="The collection name")
+
+
+class CollectionResponse(BaseModel):
+    """Response model for collection endpoints."""
+
+    success: bool = Field(..., description="Whether the operation was successful")
+    collection: CollectionInfo | None = Field(None, description="Collection info")
+    error: str | None = Field(None, description="Error message if failed")
+
+
+# Document models
+
+
+class UploadDocumentRequest(BaseModel):
+    """Request to upload a document to a collection."""
+
+    collection_id: str = Field(..., description="The collection ID to upload to")
+    document_name: str = Field(..., description="Name of the document")
+    old_document_id: str | None = Field(
+        None, description="Previous document ID to delete"
+    )
+
+
+class DocumentInfo(BaseModel):
+    """Document information."""
+
+    document_id: str = Field(..., description="The document ID in the collection")
+    document_name: str = Field(..., description="The document name")
+
+
+class DocumentResponse(BaseModel):
+    """Response model for document endpoints."""
+
+    success: bool = Field(..., description="Whether the operation was successful")
+    document: DocumentInfo | None = Field(None, description="Document info")
+    error: str | None = Field(None, description="Error message if failed")

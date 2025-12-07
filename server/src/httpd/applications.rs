@@ -2,7 +2,7 @@ use actix_web::{web, HttpResponse, Result as ActixResult};
 use paperclip::actix::api_v2_operation;
 use uuid::Uuid;
 use chrono::Utc;
-use log::{info, error};
+use log::{info, error, warn};
 
 use crate::models::{Application, CreateApplicationRequest, ApplicationResponse, ApiError};
 use crate::grok_client::{GrokClient, TalentInfo};
@@ -76,6 +76,11 @@ pub async fn create_application(
             let grok_url = data.grok_service_url.clone();
             let pool_clone = pool.clone();
             let talent_id = talent.id.clone();
+            let talent_name = talent.name.clone();
+            let collection_id = talent.collection_id.clone();
+            let old_resume_document_id = talent.resume_document_id.clone();
+            let pdf_bytes_for_upload = pdf_bytes.clone();
+            let filename_for_upload = filename.clone();
 
             tokio::spawn(async move {
                 info!("======================================================================");
@@ -150,6 +155,105 @@ pub async fn create_application(
                         error!("GROK SERVICE ERROR: {}", e);
                         error!("======================================================================");
                     }
+                }
+
+                // Get or create collection for document upload
+                let final_collection_id = if let Some(coll_id) = collection_id {
+                    Some(coll_id)
+                } else {
+                    // No collection exists, create one now
+                    warn!("======================================================================");
+                    warn!("DOCUMENT UPLOAD: No collection_id for talent {}, creating collection now", talent_id);
+                    warn!("======================================================================");
+
+                    match client.create_collection(&talent_id, &talent_name).await {
+                        Ok(response) => {
+                            if response.success {
+                                if let Some(collection) = response.collection {
+                                    info!("COLLECTION CREATED: {}", collection.collection_id);
+
+                                    // Update talent with collection_id
+                                    match crate::database::update_talent_collection_id(
+                                        &pool_clone,
+                                        talent_id.clone(),
+                                        collection.collection_id.clone(),
+                                    ).await {
+                                        Ok(_) => {
+                                            info!("SUCCESS: Updated talent {} with collection_id {}", talent_id, collection.collection_id);
+                                        },
+                                        Err(e) => {
+                                            error!("FAILED to update talent {} with collection_id: {}", talent_id, e);
+                                        }
+                                    }
+
+                                    Some(collection.collection_id)
+                                } else {
+                                    error!("COLLECTION CREATION: No collection in response");
+                                    None
+                                }
+                            } else {
+                                error!("COLLECTION CREATION: Failed - {:?}", response.error);
+                                None
+                            }
+                        }
+                        Err(e) => {
+                            error!("COLLECTION CREATION ERROR: {}", e);
+                            None
+                        }
+                    }
+                };
+
+                // Upload resume to collection
+                if let Some(coll_id) = final_collection_id {
+                    info!("======================================================================");
+                    info!("DOCUMENT UPLOAD: Uploading resume to collection");
+                    info!("======================================================================");
+                    info!("Collection ID: {}", coll_id);
+                    info!("Filename: {}", filename_for_upload);
+                    if let Some(ref old_doc_id) = old_resume_document_id {
+                        info!("Replacing old document: {}", old_doc_id);
+                    }
+
+                    match client.upload_document(
+                        &coll_id,
+                        &filename_for_upload,
+                        &pdf_bytes_for_upload,
+                        old_resume_document_id.as_deref(),
+                    ).await {
+                        Ok(doc_response) => {
+                            if doc_response.success {
+                                if let Some(doc) = doc_response.document {
+                                    info!("======================================================================");
+                                    info!("DOCUMENT UPLOAD: Success!");
+                                    info!("Document ID: {}", doc.document_id);
+                                    info!("======================================================================");
+
+                                    // Update talent with new document_id
+                                    match crate::database::update_talent_resume_document_id(
+                                        &pool_clone,
+                                        talent_id.clone(),
+                                        Some(doc.document_id.clone()),
+                                    ).await {
+                                        Ok(_) => {
+                                            info!("SUCCESS: Updated talent {} with document_id {}", talent_id, doc.document_id);
+                                        },
+                                        Err(e) => {
+                                            error!("FAILED to update talent {} with document_id: {}", talent_id, e);
+                                        }
+                                    }
+                                }
+                            } else {
+                                error!("DOCUMENT UPLOAD: Failed - {:?}", doc_response.error);
+                            }
+                        }
+                        Err(e) => {
+                            error!("======================================================================");
+                            error!("DOCUMENT UPLOAD ERROR: {}", e);
+                            error!("======================================================================");
+                        }
+                    }
+                } else {
+                    error!("DOCUMENT UPLOAD: Skipped - no collection available");
                 }
             });
         }
