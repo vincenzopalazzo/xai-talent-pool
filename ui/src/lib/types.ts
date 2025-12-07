@@ -25,6 +25,9 @@ export interface Talent {
 	x_url?: string;
 	github_url?: string;
 	gitlab_url?: string;
+	// xAI Collections integration
+	collection_id?: string;
+	resume_document_id?: string;
 }
 
 export interface Job {

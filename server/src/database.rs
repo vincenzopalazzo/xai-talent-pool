@@ -27,6 +27,18 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
         let _ = sqlx::query(statement).execute(&pool).await;
     }
 
+    // Add collection_id field (ignore error if column already exists)
+    let collection_id_schema = include_str!("../migrations/005_add_talent_collection_id.sql");
+    for statement in collection_id_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
+    // Add resume_document_id field (ignore error if column already exists)
+    let resume_doc_schema = include_str!("../migrations/006_add_talent_resume_document_id.sql");
+    for statement in resume_doc_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        let _ = sqlx::query(statement).execute(&pool).await;
+    }
+
     Ok(pool)
 }
 
@@ -217,6 +229,36 @@ pub async fn get_applications_by_job(pool: &Pool, job_id: String) -> Result<Vec<
     sqlx::query_as::<_, Application>(include_str!("queries/get_applications_by_job.sql"))
         .bind(&job_id)
         .fetch_all(pool)
+        .await
+}
+
+/// Update talent's resume_document_id
+pub async fn update_talent_resume_document_id(
+    pool: &Pool,
+    talent_id: String,
+    resume_document_id: Option<String>,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        "UPDATE talents SET resume_document_id = ? WHERE id = ? RETURNING *"
+    )
+        .bind(&resume_document_id)
+        .bind(&talent_id)
+        .fetch_optional(pool)
+        .await
+}
+
+/// Update talent's collection_id
+pub async fn update_talent_collection_id(
+    pool: &Pool,
+    talent_id: String,
+    collection_id: String,
+) -> Result<Option<Talent>, sqlx::Error> {
+    sqlx::query_as::<_, Talent>(
+        "UPDATE talents SET collection_id = ? WHERE id = ? RETURNING *"
+    )
+        .bind(&collection_id)
+        .bind(&talent_id)
+        .fetch_optional(pool)
         .await
 }
 

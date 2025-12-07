@@ -22,6 +22,9 @@ pub struct Talent {
     pub x_url: Option<String>,
     pub github_url: Option<String>,
     pub gitlab_url: Option<String>,
+    // xAI Collections integration
+    pub collection_id: Option<String>,
+    pub resume_document_id: Option<String>,
 }
 
 
