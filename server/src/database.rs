@@ -1,5 +1,5 @@
 use sqlx::SqlitePool;
-use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest};
+use crate::models::{Talent, UpdateTalentRequest, Job, UpdateJobRequest, Application};
 
 pub type Pool = SqlitePool;
 
@@ -13,6 +13,11 @@ pub async fn init_pool(database_url: &str) -> Result<Pool, sqlx::Error> {
     let jobs_schema = include_str!("../migrations/002_create_jobs_table.sql");
     // Execute each statement separately for SQLite
     for statement in jobs_schema.split(';').filter(|s| !s.trim().is_empty()) {
+        sqlx::query(statement).execute(&pool).await?;
+    }
+
+    let applications_schema = include_str!("../migrations/003_create_applications_table.sql");
+    for statement in applications_schema.split(';').filter(|s| !s.trim().is_empty()) {
         sqlx::query(statement).execute(&pool).await?;
     }
 
@@ -169,4 +174,42 @@ pub async fn delete_job(pool: &Pool, id: String) -> Result<bool, sqlx::Error> {
         .await?
         .rows_affected();
     Ok(rows > 0)
+}
+
+// Application database functions
+
+pub async fn create_application(pool: &Pool, application: &Application) -> Result<Application, sqlx::Error> {
+    sqlx::query_as::<_, Application>(include_str!("queries/insert_application.sql"))
+        .bind(&application.id)
+        .bind(&application.talent_id)
+        .bind(&application.job_id)
+        .bind(&application.resume_data)
+        .bind(&application.resume_filename)
+        .bind(&application.resume_content_type)
+        .bind(&application.cover_letter)
+        .bind(&application.status)
+        .bind(&application.created_at)
+        .fetch_one(pool)
+        .await
+}
+
+pub async fn get_application_by_id(pool: &Pool, id: String) -> Result<Option<Application>, sqlx::Error> {
+    sqlx::query_as::<_, Application>(include_str!("queries/get_application_by_id.sql"))
+        .bind(&id)
+        .fetch_optional(pool)
+        .await
+}
+
+pub async fn get_applications_by_talent(pool: &Pool, talent_id: String) -> Result<Vec<Application>, sqlx::Error> {
+    sqlx::query_as::<_, Application>(include_str!("queries/get_applications_by_talent.sql"))
+        .bind(&talent_id)
+        .fetch_all(pool)
+        .await
+}
+
+pub async fn get_applications_by_job(pool: &Pool, job_id: String) -> Result<Vec<Application>, sqlx::Error> {
+    sqlx::query_as::<_, Application>(include_str!("queries/get_applications_by_job.sql"))
+        .bind(&job_id)
+        .fetch_all(pool)
+        .await
 }

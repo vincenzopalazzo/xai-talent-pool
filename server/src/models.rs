@@ -109,3 +109,40 @@ pub struct UpdateJobRequest {
     pub status: Option<String>,
     pub expires_at: Option<String>,
 }
+
+// Application models
+
+#[derive(Serialize, Deserialize, Clone, Apiv2Schema, PartialEq, Debug, FromRow)]
+pub struct Application {
+    pub id: String,
+    pub talent_id: String,
+    pub job_id: String,
+    pub resume_data: Option<String>,      // Base64 encoded resume
+    pub resume_filename: Option<String>,
+    pub resume_content_type: Option<String>,
+    pub cover_letter: Option<String>,
+    pub status: String,                    // pending, reviewed, accepted, rejected
+    pub created_at: String,
+}
+
+#[derive(Deserialize, Apiv2Schema)]
+pub struct CreateApplicationRequest {
+    pub talent_id: String,
+    pub job_id: String,
+    pub resume_data: Option<String>,       // Base64 encoded resume
+    pub resume_filename: Option<String>,
+    pub resume_content_type: Option<String>,
+    pub cover_letter: Option<String>,
+}
+
+#[derive(Serialize, Apiv2Schema)]
+pub struct ApplicationResponse {
+    pub id: String,
+    pub talent_id: String,
+    pub job_id: String,
+    pub has_resume: bool,
+    pub resume_filename: Option<String>,
+    pub cover_letter: Option<String>,
+    pub status: String,
+    pub created_at: String,
+}

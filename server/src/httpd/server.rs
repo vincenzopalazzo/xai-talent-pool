@@ -9,6 +9,9 @@ use super::talents::{
 use super::jobs::{
     get_jobs, create_job, get_job, update_job, delete_job,
 };
+use super::applications::{
+    create_application, get_application, get_applications_by_talent, get_applications_by_job, get_application_resume,
+};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -97,6 +100,12 @@ pub async fn run_server(rest_host: &str, rest_port: u16, database_url: &str) -> 
             .service(get_job)
             .service(update_job)
             .service(delete_job)
+            // Application routes
+            .service(create_application)
+            .service(get_applications_by_talent)
+            .service(get_applications_by_job)
+            .service(get_application_resume)
+            .service(get_application)
             .build()
     })
     .bind(&bind_address)?
