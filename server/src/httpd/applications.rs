@@ -179,15 +179,31 @@ pub async fn create_application(
 
                                             // Spawn a completely separate task for social research
                                             tokio::spawn(async move {
+                                                let start_time = std::time::Instant::now();
+
                                                 // Set status to in_progress at the START of this task
-                                                info!("[SOCIAL] Starting social research task for {}", talent_id_for_social);
-                                                let _ = crate::database::update_talent_social_research_status(
+                                                info!("======================================================================");
+                                                info!("[SOCIAL] RESEARCH TASK STARTED");
+                                                info!("[SOCIAL] Talent ID: {}", talent_id_for_social);
+                                                info!("[SOCIAL] Name: {}", talent_info_for_social.name);
+                                                info!("[SOCIAL] URLs to research:");
+                                                info!("[SOCIAL]   GitHub: {:?}", github_url_for_social);
+                                                info!("[SOCIAL]   LinkedIn: {:?}", linkedin_url_for_social);
+                                                info!("[SOCIAL]   Twitter/X: {:?}", x_profile_url_for_social);
+                                                info!("======================================================================");
+
+                                                match crate::database::update_talent_social_research_status(
                                                     &pool_for_social,
                                                     talent_id_for_social.clone(),
                                                     "in_progress",
-                                                ).await;
+                                                ).await {
+                                                    Ok(_) => info!("[SOCIAL] Status set to 'in_progress'"),
+                                                    Err(e) => error!("[SOCIAL] Failed to set status to 'in_progress': {}", e),
+                                                }
 
-                                                // Use catch_unwind to ensure we ALWAYS update status
+                                                // Track errors for detailed logging
+                                                let mut error_log: Vec<String> = Vec::new();
+
                                                 let research_future = async {
                                                     let mut research_handles = Vec::new();
 
@@ -201,20 +217,31 @@ pub async fn create_application(
                                                         let old_doc_id = talent_for_social.github_report_id.clone();
                                                         let pool_for_research = pool_for_social.clone();
                                                         let tid_for_research = talent_id_for_social.clone();
+                                                        let gh_url_clone = gh_url.clone();
 
                                                         let handle = tokio::spawn(async move {
-                                                            info!("[SOCIAL] Starting GitHub research for {}", name);
-                                                            match client.research_platform(
+                                                            let platform_start = std::time::Instant::now();
+                                                            info!("[SOCIAL:GITHUB] Starting research for {} (URL: {})", name, gh_url_clone);
+
+                                                            let result = client.research_platform(
                                                                 "github",
                                                                 &name,
                                                                 email.as_deref(),
                                                                 profile_url.as_deref(),
                                                                 coll_id.as_deref(),
                                                                 old_doc_id.as_deref(),
-                                                            ).await {
+                                                            ).await;
+
+                                                            let elapsed = platform_start.elapsed();
+
+                                                            match result {
                                                                 Ok(resp) if resp.success => {
-                                                                    info!("[SOCIAL] GitHub research completed successfully");
+                                                                    info!("[SOCIAL:GITHUB] SUCCESS after {:.1}s", elapsed.as_secs_f32());
+                                                                    info!("[SOCIAL:GITHUB] Document ID: {:?}", resp.document_id);
                                                                     let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    if let Some(ref t) = tldr {
+                                                                        info!("[SOCIAL:GITHUB] TLDR: {}", t);
+                                                                    }
                                                                     let _ = crate::database::update_talent_platform_research(
                                                                         &pool_for_research,
                                                                         tid_for_research,
@@ -222,15 +249,20 @@ pub async fn create_application(
                                                                         resp.document_id.clone(),
                                                                         tldr,
                                                                     ).await;
-                                                                    ("github".to_string(), resp.document_id)
+                                                                    ("github".to_string(), resp.document_id, None)
                                                                 },
                                                                 Ok(resp) => {
-                                                                    error!("[SOCIAL] GitHub research API failed: {:?}", resp.error);
-                                                                    ("github".to_string(), None)
+                                                                    let err_msg = format!("API returned success=false: {:?}", resp.error);
+                                                                    error!("[SOCIAL:GITHUB] FAILED after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    ("github".to_string(), None, Some(err_msg))
                                                                 },
                                                                 Err(e) => {
-                                                                    error!("[SOCIAL] GitHub research error (timeout?): {}", e);
-                                                                    ("github".to_string(), None)
+                                                                    let err_msg = format!("{}", e);
+                                                                    error!("[SOCIAL:GITHUB] ERROR after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    if err_msg.contains("timeout") || err_msg.contains("timed out") {
+                                                                        error!("[SOCIAL:GITHUB] This was a TIMEOUT error");
+                                                                    }
+                                                                    ("github".to_string(), None, Some(err_msg))
                                                                 }
                                                             }
                                                         });
@@ -247,20 +279,31 @@ pub async fn create_application(
                                                         let old_doc_id = talent_for_social.linkedin_report_id.clone();
                                                         let pool_for_research = pool_for_social.clone();
                                                         let tid_for_research = talent_id_for_social.clone();
+                                                        let li_url_clone = li_url.clone();
 
                                                         let handle = tokio::spawn(async move {
-                                                            info!("[SOCIAL] Starting LinkedIn research for {}", name);
-                                                            match client.research_platform(
+                                                            let platform_start = std::time::Instant::now();
+                                                            info!("[SOCIAL:LINKEDIN] Starting research for {} (URL: {})", name, li_url_clone);
+
+                                                            let result = client.research_platform(
                                                                 "linkedin",
                                                                 &name,
                                                                 email.as_deref(),
                                                                 profile_url.as_deref(),
                                                                 coll_id.as_deref(),
                                                                 old_doc_id.as_deref(),
-                                                            ).await {
+                                                            ).await;
+
+                                                            let elapsed = platform_start.elapsed();
+
+                                                            match result {
                                                                 Ok(resp) if resp.success => {
-                                                                    info!("[SOCIAL] LinkedIn research completed successfully");
+                                                                    info!("[SOCIAL:LINKEDIN] SUCCESS after {:.1}s", elapsed.as_secs_f32());
+                                                                    info!("[SOCIAL:LINKEDIN] Document ID: {:?}", resp.document_id);
                                                                     let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    if let Some(ref t) = tldr {
+                                                                        info!("[SOCIAL:LINKEDIN] TLDR: {}", t);
+                                                                    }
                                                                     let _ = crate::database::update_talent_platform_research(
                                                                         &pool_for_research,
                                                                         tid_for_research,
@@ -268,15 +311,20 @@ pub async fn create_application(
                                                                         resp.document_id.clone(),
                                                                         tldr,
                                                                     ).await;
-                                                                    ("linkedin".to_string(), resp.document_id)
+                                                                    ("linkedin".to_string(), resp.document_id, None)
                                                                 },
                                                                 Ok(resp) => {
-                                                                    error!("[SOCIAL] LinkedIn research API failed: {:?}", resp.error);
-                                                                    ("linkedin".to_string(), None)
+                                                                    let err_msg = format!("API returned success=false: {:?}", resp.error);
+                                                                    error!("[SOCIAL:LINKEDIN] FAILED after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    ("linkedin".to_string(), None, Some(err_msg))
                                                                 },
                                                                 Err(e) => {
-                                                                    error!("[SOCIAL] LinkedIn research error (timeout?): {}", e);
-                                                                    ("linkedin".to_string(), None)
+                                                                    let err_msg = format!("{}", e);
+                                                                    error!("[SOCIAL:LINKEDIN] ERROR after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    if err_msg.contains("timeout") || err_msg.contains("timed out") {
+                                                                        error!("[SOCIAL:LINKEDIN] This was a TIMEOUT error");
+                                                                    }
+                                                                    ("linkedin".to_string(), None, Some(err_msg))
                                                                 }
                                                             }
                                                         });
@@ -289,25 +337,35 @@ pub async fn create_application(
                                                         let name = talent_info_for_social.name.clone();
                                                         let email = Some(talent_info_for_social.email.clone());
                                                         let profile_url = Some(tw_url.clone());
-                                                        info!("[SOCIAL] Twitter/X profile URL: {}", tw_url);
                                                         let coll_id = collection_id_for_social.clone();
                                                         let old_doc_id = talent_for_social.twitter_report_id.clone();
                                                         let pool_for_research = pool_for_social.clone();
                                                         let tid_for_research = talent_id_for_social.clone();
+                                                        let tw_url_clone = tw_url.clone();
 
                                                         let handle = tokio::spawn(async move {
-                                                            info!("[SOCIAL] Starting Twitter research for {}", name);
-                                                            match client.research_platform(
+                                                            let platform_start = std::time::Instant::now();
+                                                            info!("[SOCIAL:TWITTER] Starting research for {} (URL: {})", name, tw_url_clone);
+
+                                                            let result = client.research_platform(
                                                                 "twitter",
                                                                 &name,
                                                                 email.as_deref(),
                                                                 profile_url.as_deref(),
                                                                 coll_id.as_deref(),
                                                                 old_doc_id.as_deref(),
-                                                            ).await {
+                                                            ).await;
+
+                                                            let elapsed = platform_start.elapsed();
+
+                                                            match result {
                                                                 Ok(resp) if resp.success => {
-                                                                    info!("[SOCIAL] Twitter research completed successfully");
+                                                                    info!("[SOCIAL:TWITTER] SUCCESS after {:.1}s", elapsed.as_secs_f32());
+                                                                    info!("[SOCIAL:TWITTER] Document ID: {:?}", resp.document_id);
                                                                     let tldr = resp.report.as_ref().and_then(|r| r.tldr.clone());
+                                                                    if let Some(ref t) = tldr {
+                                                                        info!("[SOCIAL:TWITTER] TLDR: {}", t);
+                                                                    }
                                                                     let _ = crate::database::update_talent_platform_research(
                                                                         &pool_for_research,
                                                                         tid_for_research,
@@ -315,15 +373,20 @@ pub async fn create_application(
                                                                         resp.document_id.clone(),
                                                                         tldr,
                                                                     ).await;
-                                                                    ("twitter".to_string(), resp.document_id)
+                                                                    ("twitter".to_string(), resp.document_id, None)
                                                                 },
                                                                 Ok(resp) => {
-                                                                    error!("[SOCIAL] Twitter research API failed: {:?}", resp.error);
-                                                                    ("twitter".to_string(), None)
+                                                                    let err_msg = format!("API returned success=false: {:?}", resp.error);
+                                                                    error!("[SOCIAL:TWITTER] FAILED after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    ("twitter".to_string(), None, Some(err_msg))
                                                                 },
                                                                 Err(e) => {
-                                                                    error!("[SOCIAL] Twitter research error (timeout?): {}", e);
-                                                                    ("twitter".to_string(), None)
+                                                                    let err_msg = format!("{}", e);
+                                                                    error!("[SOCIAL:TWITTER] ERROR after {:.1}s - {}", elapsed.as_secs_f32(), err_msg);
+                                                                    if err_msg.contains("timeout") || err_msg.contains("timed out") {
+                                                                        error!("[SOCIAL:TWITTER] This was a TIMEOUT error");
+                                                                    }
+                                                                    ("twitter".to_string(), None, Some(err_msg))
                                                                 }
                                                             }
                                                         });
@@ -333,15 +396,19 @@ pub async fn create_application(
                                                     // Wait for all with timeout (5 min per request + buffer = 10 min total)
                                                     let global_timeout = std::time::Duration::from_secs(600);
                                                     let expected_count = research_handles.len();
+                                                    info!("[SOCIAL] Waiting for {} platform(s) with 10min global timeout...", expected_count);
 
                                                     let results = tokio::time::timeout(global_timeout, async {
                                                         let mut results = Vec::new();
                                                         for handle in research_handles {
                                                             match handle.await {
-                                                                Ok((platform, doc_id)) => results.push((platform, doc_id)),
+                                                                Ok((platform, doc_id, err)) => {
+                                                                    results.push((platform, doc_id, err));
+                                                                },
                                                                 Err(e) => {
-                                                                    error!("[SOCIAL] Task join error: {:?}", e);
-                                                                    results.push(("unknown".to_string(), None));
+                                                                    let err_msg = format!("Task panicked or was cancelled: {:?}", e);
+                                                                    error!("[SOCIAL] Task join error: {}", err_msg);
+                                                                    results.push(("unknown".to_string(), None, Some(err_msg)));
                                                                 }
                                                             }
                                                         }
@@ -350,9 +417,9 @@ pub async fn create_application(
 
                                                     match results {
                                                         Ok(results) => Ok((results, expected_count)),
-                                                        Err(_) => {
-                                                            error!("[SOCIAL] Global timeout (10 min) exceeded!");
-                                                            Err("timeout")
+                                                        Err(elapsed) => {
+                                                            error!("[SOCIAL] GLOBAL TIMEOUT after {:?}!", elapsed);
+                                                            Err("global timeout exceeded (10 minutes)")
                                                         }
                                                     }
                                                 };
@@ -361,6 +428,10 @@ pub async fn create_application(
                                                 let research_outcome = research_future.await;
 
                                                 // ALWAYS update status - this is the critical part
+                                                let total_elapsed = start_time.elapsed();
+                                                info!("======================================================================");
+                                                info!("[SOCIAL] RESEARCH COMPLETED - Total time: {:.1}s", total_elapsed.as_secs_f32());
+
                                                 let (final_status, reason) = match research_outcome {
                                                     Ok((results, expected)) => {
                                                         let mut gh_id = None;
@@ -368,7 +439,14 @@ pub async fn create_application(
                                                         let mut tw_id = None;
                                                         let mut success_count = 0;
 
-                                                        for (platform, doc_id) in &results {
+                                                        info!("[SOCIAL] Results summary:");
+                                                        for (platform, doc_id, err) in &results {
+                                                            let status = if doc_id.is_some() { "✓ SUCCESS" } else { "✗ FAILED" };
+                                                            info!("[SOCIAL]   {} - {} (doc_id: {:?})", platform, status, doc_id);
+                                                            if let Some(e) = err {
+                                                                error!("[SOCIAL]   {} error: {}", platform, e);
+                                                                error_log.push(format!("{}: {}", platform, e));
+                                                            }
                                                             if doc_id.is_some() {
                                                                 success_count += 1;
                                                             }
@@ -382,31 +460,49 @@ pub async fn create_application(
 
                                                         // Update report IDs if any succeeded
                                                         if success_count > 0 {
-                                                            let _ = crate::database::update_talent_social_report_ids(
+                                                            info!("[SOCIAL] Saving {} successful report ID(s) to database", success_count);
+                                                            match crate::database::update_talent_social_report_ids(
                                                                 &pool_for_social,
                                                                 talent_id_for_social.clone(),
                                                                 gh_id,
                                                                 li_id,
                                                                 tw_id,
                                                                 None,
-                                                            ).await;
+                                                            ).await {
+                                                                Ok(_) => info!("[SOCIAL] Report IDs saved successfully"),
+                                                                Err(e) => error!("[SOCIAL] Failed to save report IDs: {}", e),
+                                                            }
                                                         }
 
                                                         if success_count == 0 {
-                                                            ("failed", format!("0/{} platforms succeeded", expected))
+                                                            error!("[SOCIAL] ALL PLATFORMS FAILED!");
+                                                            if !error_log.is_empty() {
+                                                                error!("[SOCIAL] Error summary:");
+                                                                for e in &error_log {
+                                                                    error!("[SOCIAL]   - {}", e);
+                                                                }
+                                                            }
+                                                            ("failed", format!("0/{} platforms succeeded - all failed", expected))
                                                         } else {
                                                             ("completed", format!("{}/{} platforms succeeded", success_count, expected))
                                                         }
                                                     },
-                                                    Err(_) => ("failed", "global timeout exceeded".to_string()),
+                                                    Err(timeout_msg) => {
+                                                        error!("[SOCIAL] GLOBAL TIMEOUT - {}", timeout_msg);
+                                                        ("failed", timeout_msg.to_string())
+                                                    },
                                                 };
 
-                                                info!("[SOCIAL] Final status update: {} ({})", final_status, reason);
-                                                let _ = crate::database::update_talent_social_research_status(
+                                                info!("[SOCIAL] Setting final status: '{}' ({})", final_status, reason);
+                                                match crate::database::update_talent_social_research_status(
                                                     &pool_for_social,
-                                                    talent_id_for_social,
+                                                    talent_id_for_social.clone(),
                                                     final_status,
-                                                ).await;
+                                                ).await {
+                                                    Ok(_) => info!("[SOCIAL] Final status '{}' saved to database", final_status),
+                                                    Err(e) => error!("[SOCIAL] CRITICAL: Failed to save final status: {}", e),
+                                                }
+                                                info!("======================================================================");
                                             });
                                         }
                                     },
