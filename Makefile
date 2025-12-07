@@ -7,7 +7,7 @@ all: install dev
 install:
 	cd ui && npm install
 	cd server && cargo build
-	cd grok-service && pip install -e ".[dev]"
+	cd grok-service && uv pip install -e ".[dev]"
 
 # Run the development server
 ui-dev:
@@ -28,22 +28,22 @@ preview:
 # Clean build artifacts and node_modules
 clean:
 	rm -rf ui/node_modules ui/.svelte-kit ui/build
-	rm -rf grok-service/.venv grok-service/*.egg-info grok-service/src/*.egg-info
+	rm -rf grok-service/.venv grok-service/*.egg-info grok-service/src/*.egg-info grok-service/.uv
 
 # Run type checking
 check:
 	cd ui && npm run check
-	cd grok-service && python3 -m black --check src tests && python3 -m ruff check src tests
+	cd grok-service && uv run black --check src tests && uv run ruff check src tests
 
 # Format code
 format:
 	cd ui && npm run format
-	cd grok-service && python3 -m black src tests
+	cd grok-service && uv run black src tests
 
 # Lint code
 lint:
 	cd ui && npm run lint
-	cd grok-service && python3 -m ruff check src tests
+	cd grok-service && uv run ruff check src tests
 
 # Server commands
 server-dev:
@@ -65,26 +65,21 @@ dev-all:
 	make -j3 server-dev ui-dev grok-dev
 
 # Grok service commands
-GROK_VENV = grok-service/.venv
-GROK_PYTHON = $(GROK_VENV)/bin/python
+# uv manages virtual environments and dependencies automatically
+grok-install:
+	cd grok-service && uv pip install -e ".[dev]"
 
-$(GROK_VENV):
-	python3 -m venv $(GROK_VENV)
+grok-dev:
+	cd grok-service && uv run uvicorn grok_service.main:app --reload --host 0.0.0.0 --port 8001
 
-grok-install: $(GROK_VENV)
-	$(GROK_PYTHON) -m pip install -e "grok-service[dev]"
+grok-format:
+	cd grok-service && uv run black src tests
 
-grok-dev: $(GROK_VENV)
-	cd grok-service && GRPC_DNS_RESOLVER=native .venv/bin/python -m uvicorn grok_service.main:app --reload --host 0.0.0.0 --port 8001
+grok-lint:
+	cd grok-service && uv run ruff check src tests
 
-grok-format: $(GROK_VENV)
-	$(GROK_PYTHON) -m black grok-service/src grok-service/tests
+grok-test:
+	cd grok-service && uv run pytest
 
-grok-lint: $(GROK_VENV)
-	$(GROK_PYTHON) -m ruff check grok-service/src grok-service/tests
-
-grok-test: $(GROK_VENV)
-	cd grok-service && GRPC_DNS_RESOLVER=native .venv/bin/python -m pytest
-
-grok-check: $(GROK_VENV)
-	$(GROK_PYTHON) -m black --check grok-service/src grok-service/tests && $(GROK_PYTHON) -m ruff check grok-service/src grok-service/tests
+grok-check:
+	cd grok-service && uv run black --check src tests && uv run ruff check src tests
