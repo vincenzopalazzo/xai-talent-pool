@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from grok_service import __version__
-from grok_service.routers import collections_router, screening_router
+from grok_service.routers import screening_router
 
 # Load .env file
 load_dotenv()
@@ -20,7 +20,6 @@ app = FastAPI(
 
 # Include routers
 app.include_router(screening_router)
-app.include_router(collections_router)
 
 
 @app.get("/health")

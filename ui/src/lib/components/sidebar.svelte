@@ -7,11 +7,11 @@
 	let { collapsed = $bindable(false) } = $props();
 
 	const navItems = [
-		{ icon: Home, label: 'Dashboard', href: '/dashboard' },
-		{ icon: Users, label: 'Talent Pool', href: '/' },
-		{ icon: Briefcase, label: 'Jobs', href: '/jobs' },
-		{ icon: Star, label: 'Saved', href: '/saved' },
-		{ icon: Settings, label: 'Settings', href: '/settings' }
+		{ icon: Home, label: 'Dashboard', href: '/dashboard', implemented: false },
+		{ icon: Users, label: 'Talent Pool', href: '/', implemented: true },
+		{ icon: Briefcase, label: 'Jobs', href: '/jobs', implemented: true },
+		{ icon: Star, label: 'Saved', href: '/saved', implemented: false },
+		{ icon: Settings, label: 'Settings', href: '/settings', implemented: false }
 	];
 
 	// Determine active state based on current path
@@ -51,17 +51,28 @@
 
 	<nav class="flex-1 space-y-1 p-2">
 		{#each navItems as item}
-			<a
-				href={item.href}
-				class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent {isActive(item.href)
-					? 'bg-sidebar-accent text-sidebar-accent-foreground'
-					: 'text-sidebar-foreground'} {collapsed ? 'justify-center' : ''}"
-			>
-				<item.icon class="h-5 w-5 shrink-0" />
-				{#if !collapsed}
-					<span>{item.label}</span>
-				{/if}
-			</a>
+			{#if item.implemented}
+				<a
+					href={item.href}
+					class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors hover:bg-sidebar-accent {isActive(item.href)
+						? 'bg-sidebar-accent text-sidebar-accent-foreground'
+						: 'text-sidebar-foreground'} {collapsed ? 'justify-center' : ''}"
+				>
+					<item.icon class="h-5 w-5 shrink-0" />
+					{#if !collapsed}
+						<span>{item.label}</span>
+					{/if}
+				</a>
+			{:else}
+				<div
+					class="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors text-sidebar-foreground opacity-50 cursor-not-allowed {collapsed ? 'justify-center' : ''}"
+				>
+					<item.icon class="h-5 w-5 shrink-0" />
+					{#if !collapsed}
+						<span>{item.label}</span>
+					{/if}
+				</div>
+			{/if}
 		{/each}
 	</nav>
 
