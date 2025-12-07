@@ -120,6 +120,12 @@ make grok-check    # Run black and ruff checks
 - Use xai-sdk for Grok API integration
 - OpenAPI docs at `/docs` (Swagger UI) and `/redoc`
 
+### Package Management
+- Use **uv** for Python package management and virtual environments
+- uv provides faster dependency resolution and installation
+- All Python commands are wrapped with `uv run` in the Makefile
+- Python version specified in `.python-version` file
+
 ### Code Quality
 - Use black for code formatting (line length: 88)
 - Use ruff for linting
