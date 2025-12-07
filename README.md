@@ -2,6 +2,11 @@
 
 A powerful tool for recruiters to search and compile information about candidates across multiple social media platforms using AI.
 
+
+## Trained model
+Below consists of a training run done on the RLHF data collected from using the reranking option in multiple job postings.
+https://colab.research.google.com/drive/1LZQ5eefUg6OnHTPD-tsMarkrnuKYkwaB?usp=sharing
+
 ## Features
 
 - 🔍 Searches GitHub, LinkedIn, Twitter/X, and Stack Overflow
